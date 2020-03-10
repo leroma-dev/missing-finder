@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FacialRecon</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <script type="text/javascript" src="{{ url_for('static', filename='lodash.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='immutable.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='axios.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='jquery.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+<body>
+
+<div class="container">
+    <h1>Face Recognition</h1>
+
+    <ul class="tabs">
+        <li data-section="extract-content">Extrair</li>
+        <li data-section="train-content">Treinar</li>
+        <li data-section="recognize-content">Reconhecer</li>
+    </ul>
+
+    <div id="extract-content">
+        <h2>Extrair</h2>
+        <form method="post" id="extract">
+            <div class="message">
+
+            </div>
+            <p class="description">Faça upload de uma images para extrair as faces.</p>
+            <div class="form-item">
+                <label for="input-file">Imagens</label>
+                <input type="file" name="file" id="extract-file" accept="image/*,video/*"/>
+            </div>
+            <div class="form-action">
+                <button type="submit">Extrair</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="train-content">
+        <h2>Treinar</h2>
+        <form method="post" id="train">
+            <div class="message">
+
+            </div>
+            <p class="description">Faça upload de uma imagem de uma face e dê um nome com que ela será reconhecida.</p>
+            <div class="form-item">
+                <label for="input-file">Imagem</label>
+                <input type="file" name="file" id="input-file" accept="image/*"/>
+            </div>
+            <div class="form-item">
+                <label>Hash</label>
+                <input id="hash-field" name="hash" value="" type="text" placeholder="Hash"/>
+            </div>
+            <div class="form-action">
+                <button type="submit">Treinar</button>
+            </div>
+        </form>
+    </div>
+
+    <div id="recognize-content">
+        <h2>Reconhecer</h2>
+
+        <form method="post" id="recognize">
+            <div class="message">
+
+            </div>
+            <p class="description">Faça upload de uma imagem e eu te direi quem é na foto.</p>
+            <div class="form-item">
+                <label for="input-file">Imagem/Video</label>
+                <input type="file" name="file" id="recognize-input-file" accept="image/*,video/*"/>
+            </div>
+            <div class="form-item">
+                <label>Id</label>
+                <input id="id-field" name="id" value="" type="text" placeholder="id"/>
+            </div>
+            <div class="form-action">
+                <button type="submit">Reconhecer</button>
+            </div>
+        </form>
+    </div>
+
+</div>
+
+</body>
+</html>
