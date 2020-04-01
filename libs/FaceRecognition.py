@@ -1,26 +1,21 @@
 from PIL import Image, ImageDraw
-from imutils.video import FileVideoStream
-from imutils.video import VideoStream
-import numpy as np
-import glob, os, codecs, json, imutils, cv2
-import pickle
+import glob, os, codecs, json
 import face_recognition
 
-from libs.models import FrameModel
 from .models.FaceBundle import FaceBundle
 
 
 class FaceRecognition:
     def __init__(self, storageFolderPath='./storage/',
                  knownFolderPath='./known/',
-                 unkwonFolderPath='./unknown/',
+                 unknownFolderPath='./unknown/',
                  outputFolderPath='./output',
                  outputData='outputData.json',
                  tolerance=0.6):
 
         self.storageFolderPath = storageFolderPath
         self.knownFolderPath = knownFolderPath
-        self.unkwonFolderPath = unkwonFolderPath
+        self.unknownFolderPath = unknownFolderPath
         self.outputFolderPath = outputFolderPath
 
         # self.faceBundleFile = storageFolderPath+'facebundlefile.obj'
@@ -39,8 +34,8 @@ class FaceRecognition:
     def setKnownFolderPath(self, knownFolderPath):
         self.knownFolderPath = knownFolderPath
 
-    def setUnknownFolderPath(self, unkwonFolderPath):
-        self.unkwonFolderPath = unkwonFolderPath
+    def setUnknownFolderPath(self, unknownFolderPath):
+        self.unknownFolderPath = unknownFolderPath
 
     def setOuputFolderPath(self, outputFolderPath):
         self.outputFolderPath = outputFolderPath
@@ -184,68 +179,6 @@ class FaceRecognition:
                 faceBundle.set_is_known(True)
             faceList.append(faceBundle.toData())
         return faceList
-
-    def videoRecognition(self, videoPath, fileStream=True, skipFrames=10, showVideo=False, id='') -> list:
-        actual_frame: FrameModel
-        frame_list: list = []
-        # start the video stream thread
-        print("[INFO] starting video stream thread...")
-
-        # to stream from a file
-        if fileStream:
-            vs = FileVideoStream(videoPath).start()
-        else:
-            vs = VideoStream(src=0).start()
-
-        frameCount = 0
-        vs.thread.setName('Stream Thread')
-
-        # loop over frames from the video stream
-        while True:
-            # if this is a file video stream, then we need to check if
-            # there any more frames left in the buffer to process
-            if fileStream and not vs.more() or vs.stopped:
-                break
-
-            # grab the frame from the threaded video file stream, resize
-            # it, and convert it to grayscale channels
-            frame = vs.read()
-            frame = imutils.resize(frame, width=450)
-            frameCount += 1
-
-            # Recognition
-            if frameCount % skipFrames == 0:
-                print('At Frame #{}'.format(frameCount))
-                face_list = self.findMatches(videoPath, image_read=frame, id='{}_{}'.format(id, frameCount))
-                actual_frame = FrameModel.FrameModel(videoPath, frameCount)
-                actual_frame.set_face_list(face_list)
-                print('Frame #{} FaceCount {}'.format(actual_frame.get_frame_count(), actual_frame.get_face_count()))
-                frame_list.append(actual_frame)
-
-            # show the frame
-            if showVideo:
-                cv2.imshow("Frame", frame)
-                key = cv2.waitKey(1) & 0xFF
-                # if the `q` key was pressed, break from the loop
-                if key == ord("q"):
-                    break
-
-        # do a bit of cleanup
-        if showVideo:
-            cv2.destroyAllWindows()
-        vs.stop()
-
-        return frame_list
-
-    # def saveKnownFaces(self):
-    #     # dataArray = []
-    #     # for faceBundle in self.knownFaces:
-    #     #     jsonData = faceBundle.toData()
-    #     #     dataArray.append(jsonData)
-    #     # json.dump(dataArray, codecs.open(self.csvFile, 'a', encoding='utf-8'), separators=(',', ':'), sort_keys=True)
-    #     face_bundle_file = open(self.faceBundleFile, 'wb')
-    #     pickle.dump(self.knownFaces, face_bundle_file)
-    #     face_bundle_file.close()
 
     def parseFromJson(self, json_path):
         obj_text = codecs.open(json_path, 'r', encoding='utf-8').read()

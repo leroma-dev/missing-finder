@@ -1,7 +1,3 @@
-var extract_data = {
-    file: null
-};
-
 var train_data = {
     hash: "",
     file: null
@@ -25,7 +21,7 @@ function render(){
    $('.tabs li:first').addClass('active');
 
 
-   active_section = 'extract-content';
+   active_section = 'train-content';
 
     $('#'+active_section).show();
 
@@ -42,7 +38,7 @@ function update(){
         $('.message').html('');
     }
 
-    $('#extract-content, #train-content, #recognize-content').hide();
+    $('#train-content, #recognize-content').hide();
     $('#'+active_section).show();
 
 
@@ -63,18 +59,6 @@ $(document).ready(function(){
 
         //set file object to train_data
         train_data.file = _.get(event, 'target.files[0]', null);
-
-
-    });
-
-    // listen for file added
-
-    $('#extract #extract-file').on('change', function(event){
-
-
-
-        //set file object to train_data
-        extract_data.file = _.get(event, 'target.files[0]', null);
 
 
     });
@@ -113,7 +97,7 @@ $(document).ready(function(){
 
     // listen the form train submit
 
-    $('#train').submit(function(event){
+    $('#train').submit(function(e){
 
         message = null;
 
@@ -145,11 +129,11 @@ $(document).ready(function(){
             message = {type: "error", message: "Hash e imagem da face necessários."}
 
 
-
+            update();
         }
 
-        update();
-        event.preventDefault();
+
+        e.preventDefault();
     });
 
 
@@ -198,39 +182,8 @@ $(document).ready(function(){
         e.preventDefault();
     });
 
-    // listen for recognition form submit
-    $('#extract').submit(function(e){
-
-
-
-        // call to backend
-        var extract_form_data = new FormData();
-        extract_form_data.append('file', extract_data.file);
-
-        axios.post('/api/extract', extract_form_data).then(function(response){
-
-
-            console.log("Number of faces found on image is", response.data);
-
-            message = {type: 'success', message: 'Número de faces encontradas na imagem: '+ response.data.number};
-
-            extract_data = {file: null};
-            update();
-
-        }).catch(function(err){
-
-
-            message = {type: 'error', message: _.get(err, 'response.data.error.message', 'Unknown error')};
-
-            update();
-
-        });
-        e.preventDefault();
-    });
-
-
-// render the app;
-render();
+    // render the app;
+    render();
 
 });
 
