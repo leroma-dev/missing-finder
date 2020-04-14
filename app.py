@@ -90,6 +90,10 @@ def recognize():
     else:
         file = request.files['file']
         id = request.form['id']
+        if 'tolerance' in request.form:
+            tolerance = float(request.form['tolerance'])
+        else:
+            tolerance = 0.6
         if file.mimetype not in app.config['FILE_ALLOWED']:
             return error_handle("File extension is not allowed")
         else:
@@ -98,7 +102,7 @@ def recognize():
             file_path = path.join(unknown_storage, filename)
             file.save(file_path)
 
-            name_list = app.face.findMatches(file_path, id=id)
+            name_list = app.face.findMatches(file_path, tolerance, id=id)
             if len(name_list):
                 return_output = json.dumps({"path": "./assets/output/result_"+id+".jpg", "name": [name_list]}, indent=2, sort_keys=True)
             else:

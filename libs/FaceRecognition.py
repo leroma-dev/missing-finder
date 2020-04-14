@@ -76,9 +76,9 @@ class FaceRecognition:
             count += 1
         return listFaces
 
-    def __hasMatch(self, knownEncodings, faceBundle, debug=True):
+    def __hasMatch(self, knownEncodings, faceBundle, tolerance, debug=True):
         matches = face_recognition.compare_faces(knownEncodings, faceBundle.getEncodings(),
-                                                 tolerance=self.toleranceRate)
+                                                 tolerance=tolerance)
         if debug:
             for i in range(0, len(self.knownFaces)):
                 if True == matches[i]:
@@ -151,7 +151,7 @@ class FaceRecognition:
         if face:
             self.knownFaces.append(face)
 
-    def findMatches(self, filePath, image_read=None, draw_matches=True, id='') -> list:
+    def findMatches(self, filePath, tolerance, image_read=None, draw_matches=True, id='') -> list:
         faceList: list = []
 
         #   Find Faces
@@ -170,7 +170,7 @@ class FaceRecognition:
             knownFacesEncoding.append(knownFace.getEncodings())
 
         for faceBundle in faceBundleList:
-            matches = self.__hasMatch(knownFacesEncoding, faceBundle)
+            matches = self.__hasMatch(knownFacesEncoding, faceBundle, tolerance)
             if draw_matches and len(matches) > 0 and True in matches:
                 first_match_index = matches.index(True)
                 name = self.knownFaces[first_match_index].getName()
