@@ -1,17 +1,19 @@
+from .models.FaceBundle import FaceBundle
+from libs.S3Util import S3Util
 from PIL import Image, ImageDraw
 import glob, os, codecs, json
 import face_recognition
-
-from .models.FaceBundle import FaceBundle
-
+import io
+import tempfile
 
 class FaceRecognition:
-    def __init__(self, storageFolderPath='./storage/',
-                 knownFolderPath='./known/',
-                 unknownFolderPath='./unknown/',
-                 outputFolderPath='./output',
-                 outputData='outputData.json',
-                 tolerance=0.6):
+    def __init__(self, storageFolderPath='storage/',
+        knownFolderPath='known/',
+        unknownFolderPath='unknown/',
+        outputFolderPath='output/',
+        outputData='outputData.json',
+        tolerance=0.6,
+        s3_util=None):
 
         self.storageFolderPath = storageFolderPath
         self.knownFolderPath = knownFolderPath
@@ -22,6 +24,7 @@ class FaceRecognition:
         self.csvFile = outputData
         self.toleranceRate = tolerance
         self.knownFaces = []
+        self.s3_util = s3_util
 
 
         # if os.path.exists(self.faceBundleFile):
@@ -54,7 +57,9 @@ class FaceRecognition:
         listFaces: list = []
         # Load test image to find faces in
         if image_read is None:
-            image_read = face_recognition.load_image_file(filePath)
+            with tempfile.TemporaryFile() as data:
+                self.s3_util.download_file(data, filePath)
+                image_read = face_recognition.load_image_file(data)
 
         # File Identification
         filename_w_ext = os.path.basename(filePath)
@@ -118,7 +123,7 @@ class FaceRecognition:
             top, right, bottom, left = face.getLocation()
             face_image = image[top:bottom, left:right]
             pil_image = Image.fromarray(face_image)
-            resultPath = "{}/{}.jpg".format(self.outputFolderPath, face.getName())
+            resultPath = "{}.jpg".format(face.getName())
             pil_image.save(resultPath)
         print("pullFaces -- {} Faces Found".format(len(listFaces)))
         print("pullFaces -- Done")
@@ -140,8 +145,8 @@ class FaceRecognition:
     #                 print("Encoding Error on", filename)
     #         self.saveKnownFaces()
 
-    def addKnownFace(self, filePath) -> FaceBundle:
-        faceBundleList = self.__parseFaces(filePath)
+    def addKnownFace(self, file_path, file_content) -> FaceBundle:
+        faceBundleList = self.__parseFaces(file_path)
         if len(faceBundleList):
             self.knownFaces.append(faceBundleList[0])
 #            self.saveKnownFaces()
@@ -155,12 +160,14 @@ class FaceRecognition:
         faceList: list = []
 
         #   Find Faces
-        faceBundleList = self.__parseFaces(filePath, image_read)
+        faceBundleList = self.__parseFaces(filePath)
 
         #   Prepare to Draw
         if draw_matches:
             if image_read is None:
-                image_read = face_recognition.load_image_file(filePath)
+                with tempfile.TemporaryFile() as data:
+                    self.s3_util.download_file(data, filePath)
+                    image_read = face_recognition.load_image_file(data)
             pil_image = Image.fromarray(image_read)
             draw = ImageDraw.Draw(pil_image)
 
@@ -175,7 +182,9 @@ class FaceRecognition:
                 first_match_index = matches.index(True)
                 name = self.knownFaces[first_match_index].getName()
                 self.__drawImage(draw, faceBundle, name, drawBox=True)
-                pil_image.save('{}/result_{}.jpg'.format(self.outputFolderPath, id))
+                b = io.BytesIO()
+                pil_image.save(b, 'jpeg')
+                self.s3_util.upload_file(b.getvalue(), self.outputFolderPath+"result_"+id+".jpg")
                 faceBundle.set_is_known(True)
             faceList.append(faceBundle.toData())
         return faceList
@@ -192,7 +201,7 @@ class FaceRecognition:
     #     csvFile.close()
 
     def mark_face(self, face_id):
-        file_list = glob.glob('{}/result_{}_*.jpg'.format(self.outputFolderPath, face_id))
+        file_list = glob.glob('result_{}_*.jpg'.format(face_id))
         file_count = 0
         for file in file_list:
             self.findMatches(file, id='{}_{}'.format(face_id, file_count))
