@@ -47,15 +47,12 @@ def missing_person(user_id, user_type):
     item = user_controller.get_missed_person(user_id, user_type)
     return success_handle(item)
 
-
 @app.route('/api/allMissingPerson', methods=['GET'])
 def get_all_missing_person():
     item = user_controller.get_all_missed_person()
     return (item)
 
-
 # body request with the data to save {
-#     "type": "missed"
 #     "name": "janedoe",
 #     "age": 25,
 # }
@@ -66,15 +63,15 @@ def missing_person_save():
     output = json.dumps(item)
     return success_handle(output)
 
-@app.route('/api/missingPerson/update/<id>', methods=['PUT'])
-def missing_person_update():
-    output = json.dumps({"api": '1.0'})
-    return success_handle(output)
+@app.route('/api/missingPerson/update/<user_id>/<user_type>', methods=['PUT'])
+def missing_person_update(user_id, user_type):
+    output = user_controller.update_state_person_found(user_id, user_type)
+    return (output)
 
-# @app.route('/apimissingPerson/remove/<id>', methods=['DELETE'])
-# def homepage():
-#     output = json.dumps({"api": '1.0'})
-#     return success_handle(output)
+@app.route('/api/missingPerson/remove/<id>/<type>', methods=['PUT'])
+def missing_person_soft_delete(id, type):
+    output = user_controller.soft_delete_missed_person(id, type)
+    return (output)
 
 # route to train a face
 @app.route('/api/train', methods=['POST'])

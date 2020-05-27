@@ -37,7 +37,42 @@ def save_missed_person(body):
     date = str(aux_date).replace('-', '').replace(':', '').replace('.', '').replace(' ', '')
     id = body['name'][0].upper() + body['name'][1].upper() + date
     body.update({'id' : id})
-    body.update({'type' : 'missed'})
+    body.update({'type' : 'user'})
     body.update({'date' : str(aux_date)})
+    body.update({'status' : "missed"})
 
     return table.put_item( Item={**body} )
+
+def update_state_person_found(user_id, user_type):
+    response = table.update_item(
+        Key={
+            'id': user_id,
+            'type': user_type
+        },
+        UpdateExpression="set #info = :t",
+        ExpressionAttributeValues={
+            ':t': "found",
+        },
+        ExpressionAttributeNames={
+            '#info': 'status',
+        },
+        ReturnValues="UPDATED_NEW"
+    )
+    return (json.dumps(response, indent=4, cls=DecimalEncoder))
+
+def soft_delete_missed_person(user_id, user_type):
+    response = table.update_item(
+        Key={
+            'id': user_id,
+            'type': user_type
+        },
+        UpdateExpression="set #info = :t",
+        ExpressionAttributeValues={
+            ':t': "deleted",
+        },
+        ExpressionAttributeNames={
+            '#info': 'status',
+        },
+        ReturnValues="UPDATED_NEW"
+    )
+    return (json.dumps(response, indent=4, cls=DecimalEncoder))
