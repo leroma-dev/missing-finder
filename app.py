@@ -20,6 +20,7 @@ app.face = FaceRecognition(storageFolderPath='storage/',
                            s3_util=s3_util)
 # app.face.parseKnownFaces()
 
+
 def success_handle(output, status=200, mimetype='application/json'):
     return Response(output, status=status, mimetype=mimetype)
 
@@ -49,8 +50,9 @@ def get_all_missing_person():
     return (item)
 
 # body request with the data to save {
-#     "name": "janedoe",
-#     "age": 25,
+#     "id": 1,            //Number
+#     "name": "janedoe",  //String
+#     "age": 25,          //Number
 # }
 @app.route('/api/missingPerson/save', methods=['POST'])
 def missing_person_save():
@@ -86,20 +88,31 @@ def train():
             return error_handle("Imagens suportadas: *.png , *.jpg")
         else:
             # get name in form data
-            name = request.form['hash']
+            # name = request.form['hash']
+            user_id = request.form['id']
+            name = request.form['name']
+            age = request.form['age']
+
 
             print("Information of that face", name)
-            print("File is allowed and will be saved in 'known' AWS S3 bucket folder")
+            print("File is allowed and will be saved in AWS S3 bucket folder")
 
             filename = secure_filename(name+'.jpg')
             file_path = path.join('known/', filename)
             file_content = file.read()
-           
-            s3_util.upload_file(file_content=file_content, object_name="known/"+filename)
 
-            faceBundle = app.face.addKnownFace(file_path, file_content=file_content)
+            body = {"id": int(user_id), "name": name, "age": int(age)}
+            item = user_controller.save_missed_person(body)
+            output = json.dumps(item)
 
-            return_output = json.dumps(faceBundle.toData())
+            s3_path = "missing/" + user_id + "/" + filename
+
+            s3_util.upload_file(file_content=file_content, object_name=s3_path)
+
+            # faceBundle = app.face.addKnownFace(file_path, file_content=file_content)
+            faceBundle = app.face.addKnownFace(s3_path, file_content=file_content)
+
+            return_output = output + json.dumps(faceBundle.toData())
             # return_output = json.dumps({"success": True, "name": name, "face": [json_data]}, indent=2, sort_keys=True)
             #         return success_handle(return_output)
             #         return error_handle("error message")
@@ -129,7 +142,7 @@ def recognize():
 
             name_list = app.face.findMatches(file_path, tolerance, id=id)
             if len(name_list):
-                return_output = json.dumps({"path": "./assets/output/result_"+id+".jpg", "name": [name_list]}, indent=2, sort_keys=True)
+                return_output = json.dumps({"path": "S3 Bucket - ./output/result_"+id+".jpg", "name": [name_list]}, indent=2, sort_keys=True)
             else:
                 return error_handle("Face não reconhecida na imagem.")
         return success_handle(return_output)

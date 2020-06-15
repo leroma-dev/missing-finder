@@ -12,8 +12,9 @@ class DecimalEncoder(json.JSONEncoder):
                 return int(o)
         return super(DecimalEncoder, self).default(o)
 
-dynamodb = boto3.resource('dynamodb', endpoint_url="http://localhost:8000")
-table = dynamodb.Table('users2')
+# dynamodb = boto3.resource('dynamodb', endpoint_url="http://localhost:8000")
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('missed_ones')
 
 def get_all_missed_person():
     data = table.scan()
@@ -34,9 +35,9 @@ def get_missed_person(id, type):
 def save_missed_person(body):
     # create a id to get the person
     aux_date = datetime.now()
-    date = str(aux_date).replace('-', '').replace(':', '').replace('.', '').replace(' ', '')
-    id = body['name'][0].upper() + body['name'][1].upper() + date
-    body.update({'id' : id})
+    # date = str(aux_date).replace('-', '').replace(':', '').replace('.', '').replace(' ', '')
+    #id = body['name'][0].upper() + body['name'][1].upper() + date
+    #body.update({'id' : id})
     body.update({'type' : 'user'})
     body.update({'date' : str(aux_date)})
     body.update({'status' : "missed"})
