@@ -10,7 +10,6 @@ from bson.json_util import loads
 from bson.json_util import dumps
 from bson.objectid import ObjectId
 
-import user_controller
 
 app = Flask(__name__)
 app.config.from_object('config.Config')
@@ -46,12 +45,14 @@ def homepage():
     output = json.dumps({"api": '1.0'})
     return success_handle(output)
 
+# API missing person
 @app.route('/api/missingPerson/<id>/<status>', methods=['GET'])
 def missing_person(id, status):
     cursor = db.missed.find_one({
         "_id": ObjectId(id),
         "status": status,
     })
+    print(cursor)
     result = loads(json.dumps(cursor, default=str))
     return jsonify(result)
 
@@ -75,6 +76,7 @@ def missing_person_update(id, status):
     )
     result = loads(json.dumps(output, default=str))
     return jsonify(result)
+# API missing person
 
 # route to train a face
 @app.route('/api/train', methods=['POST'])
