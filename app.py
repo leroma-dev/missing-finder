@@ -1,10 +1,14 @@
 # coding=utf-8
-from flask import Flask, json, Response, request, render_template, send_file
+from flask import Flask, json, Response, request, render_template, send_file, jsonify
 from libs.FaceRecognition import FaceRecognition
 from libs.models.FaceBundle import FaceBundle
 from libs.S3Util import S3Util
 from os import path, getcwd
 from werkzeug.utils import secure_filename
+from pymongo import MongoClient, ReturnDocument
+from bson.json_util import loads
+from bson.json_util import dumps
+from bson.objectid import ObjectId
 
 import user_controller
 
@@ -19,6 +23,9 @@ app.face = FaceRecognition(storageFolderPath='storage/',
                            outputFolderPath='output/',
                            s3_util=s3_util)
 # app.face.parseKnownFaces()
+
+client = MongoClient('mongodb://localhost:27017/test')
+db = client['test_database']
 
 
 def success_handle(output, status=200, mimetype='application/json'):
@@ -39,37 +46,35 @@ def homepage():
     output = json.dumps({"api": '1.0'})
     return success_handle(output)
 
-@app.route('/api/missingPerson/<user_id>/<user_type>', methods=['GET'])
-def missing_person(user_id, user_type):
-    item = user_controller.get_missed_person(user_id, user_type)
-    return success_handle(item)
+@app.route('/api/missingPerson/<id>/<status>', methods=['GET'])
+def missing_person(id, status):
+    cursor = db.missed.find_one({
+        "_id": ObjectId(id),
+        "status": status,
+    })
+    result = loads(json.dumps(cursor, default=str))
+    return jsonify(result)
 
 @app.route('/api/allMissingPerson', methods=['GET'])
 def get_all_missing_person():
-    item = user_controller.get_all_missed_person()
-    return (item)
+    cursor = list(db.missed.find())
+    result = loads(json.dumps(cursor, default=str))
+    return jsonify(result)
 
-# body request with the data to save {
-#     "id": 1,            //Number
-#     "name": "janedoe",  //String
-#     "age": 25,          //Number
-# }
 @app.route('/api/missingPerson/save', methods=['POST'])
 def missing_person_save():
     body = request.get_json()
-    item = user_controller.save_missed_person(body)
-    output = json.dumps(item)
-    return success_handle(output)
+    result = db.missed.insert_one(body)
+    return success_handle(result)
 
-@app.route('/api/missingPerson/update/<user_id>/<user_type>', methods=['PUT'])
-def missing_person_update(user_id, user_type):
-    output = user_controller.update_state_person_found(user_id, user_type)
-    return (output)
-
-@app.route('/api/missingPerson/remove/<id>/<type>', methods=['PUT'])
-def missing_person_soft_delete(id, type):
-    output = user_controller.soft_delete_missed_person(id, type)
-    return (output)
+@app.route('/api/missingPerson/updateStatus/<id>/<status>', methods=['PUT'])
+def missing_person_update(id, status):
+    output = db.missed.find_one_and_update(
+        { "_id": ObjectId(id) },
+        { "$set": { "status": status }},
+    )
+    result = loads(json.dumps(output, default=str))
+    return jsonify(result)
 
 # route to train a face
 @app.route('/api/train', methods=['POST'])
