@@ -1,12 +1,14 @@
 # coding=utf-8
-from flask import Flask, json, Response, request, render_template, send_file
+from flask import Flask, json, Response, request, render_template, send_file, jsonify
 from libs.FaceRecognition import FaceRecognition
 from libs.models.FaceBundle import FaceBundle
 from libs.S3Util import S3Util
 from os import path, getcwd
 from werkzeug.utils import secure_filename
+import psycopg2
+import json
+from datetime import date
 
-import user_controller
 
 app = Flask(__name__)
 app.config.from_object('config.Config')
@@ -20,6 +22,13 @@ app.face = FaceRecognition(storageFolderPath='storage/',
                            s3_util=s3_util)
 # app.face.parseKnownFaces()
 
+conn = psycopg2.connect(
+    host = '127.0.0.1',
+    database = 'postgres',
+    user = 'postgres',
+    password = 'mysecretpassword'
+)
+cur = conn.cursor()
 
 def success_handle(output, status=200, mimetype='application/json'):
     return Response(output, status=status, mimetype=mimetype)
@@ -33,21 +42,51 @@ def error_handle(error_message, status=500, mimetype='application/json'):
 def page_home():
     return render_template('index.html')
 
-#
+
 @app.route('/api', methods=['GET'])
 def homepage():
     output = json.dumps({"api": '1.0'})
     return success_handle(output)
 
-@app.route('/api/missingPerson/<user_id>/<user_type>', methods=['GET'])
-def missing_person(user_id, user_type):
-    item = user_controller.get_missed_person(user_id, user_type)
-    return success_handle(item)
-
 @app.route('/api/allMissingPerson', methods=['GET'])
-def get_all_missing_person():
-    item = user_controller.get_all_missed_person()
-    return (item)
+def missing_person():
+    cur.execute("select * FROM missing_finder.pessoa_desaparecida as pd INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id;")
+    result = cur.fetchall()
+    return jsonify(buildInformation(result))
+
+@app.route('/api/missedPerson/<id>', methods=['GET'])
+def one_missing_person(id):
+    cur.execute("select * FROM missing_finder.pessoa_desaparecida as pd INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id where pd.id = %s;", (id))
+    result = cur.fetchall()
+    return jsonify(buildInformation(result))
+
+def buildInformation(values):
+    result = []
+    for value in values:
+        buildData = {
+            "id": value[1],
+            "nome": value[0],
+            "idade": value[3],
+            "data_desaparecimento": value[4],
+            "parentesco": value[5],
+            "mensagem_de_aviso": value[6],
+            "mensagem_para_desaparecido": value[7],
+            "status_desaparecido": value[8],
+            "endereco": value[9],
+            "user": {
+                "nome": value[14],
+                "email": value[12],
+                "telefone": value[13]
+            }
+        }
+        result.append(buildData)
+    return result
+
+
+# @app.route('/api/allMissingPerson', methods=['GET'])
+# def get_all_missing_person():
+#     item = user_controller.get_all_missed_person()
+#     return (item)
 
 # body request with the data to save {
 #     "id": 1,            //Number
@@ -56,20 +95,27 @@ def get_all_missing_person():
 # }
 @app.route('/api/missingPerson/save', methods=['POST'])
 def missing_person_save():
-    body = request.get_json()
-    item = user_controller.save_missed_person(body)
+    body = request.get_json(force=True)
+
+    query = "INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco, status_desaparecido) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+
+    data = (body['nome'], body['nascimento'], body['data_desaparecimento'], body['parentesco'], body['mensagem_de_aviso'], body['mensagem_para_desaparecido'], body['usuario_id'], json.dumps(body['endereco']), body['status_desaparecido'])
+
+    item = cur.execute(query, data)
+    conn.commit()
+ 
     output = json.dumps(item)
     return success_handle(output)
 
-@app.route('/api/missingPerson/update/<user_id>/<user_type>', methods=['PUT'])
-def missing_person_update(user_id, user_type):
-    output = user_controller.update_state_person_found(user_id, user_type)
-    return (output)
+# @app.route('/api/missingPerson/update/<user_id>/<user_type>', methods=['PUT'])
+# def missing_person_update(user_id, user_type):
+#     output = user_controller.update_state_person_found(user_id, user_type)
+#     return (output)
 
-@app.route('/api/missingPerson/remove/<id>/<type>', methods=['PUT'])
-def missing_person_soft_delete(id, type):
-    output = user_controller.soft_delete_missed_person(id, type)
-    return (output)
+# @app.route('/api/missingPerson/remove/<id>/<type>', methods=['PUT'])
+# def missing_person_soft_delete(id, type):
+#     output = user_controller.soft_delete_missed_person(id, type)
+#     return (output)
 
 # route to train a face
 @app.route('/api/train', methods=['POST'])
