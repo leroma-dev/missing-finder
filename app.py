@@ -7,7 +7,6 @@ from os import path, getcwd
 from werkzeug.utils import secure_filename
 import psycopg2
 import json
-from datetime import date
 
 
 app = Flask(__name__)
@@ -48,52 +47,78 @@ def homepage():
     output = json.dumps({"api": '1.0'})
     return success_handle(output)
 
-@app.route('/api/allMissingPerson', methods=['GET'])
+@app.route('/api/allMissedPerson', methods=['GET'])
 def missing_person():
-    cur.execute("select * FROM missing_finder.pessoa_desaparecida as pd INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id;")
+    query = """
+        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.status_desaparecido, pd.endereco, u.id, u.email, u.telefone, u.nome_completp
+        FROM missing_finder.pessoa_desaparecida as pd 
+        INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id
+    """
+    cur.execute(query)
     result = cur.fetchall()
     return jsonify(buildInformation(result))
 
 @app.route('/api/missedPerson/<id>', methods=['GET'])
 def one_missing_person(id):
-    cur.execute("select * FROM missing_finder.pessoa_desaparecida as pd INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id where pd.id = %s;", (id))
+    query = """
+        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.status_desaparecido, pd.endereco, u.id, u.email, u.telefone, u.nome_completp
+        FROM missing_finder.pessoa_desaparecida as pd 
+        INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id
+        WHERE pd.id = %s
+    """
+    cur.execute(query, (id))
     result = cur.fetchall()
     return jsonify(buildInformation(result))
+
+def get_tips(id):
+    query = """
+    select ppd.id, ppd.nome, ppd.idade, ppd.descricao, ppd.endereco
+    FROM missing_finder.pistas_pessoa_desaparecida ppd
+    WHERE ppd.pessoa_desaparecida_id = %s
+    """
+    cur.execute(query, (str(id)))
+    result = cur.fetchall()
+
+    if result:
+        tips = []
+        for value in result:
+            tip = {
+                "id": value[0],
+                "nome": value[1],
+                "idade": value[2],
+                "descricao": value[3],
+                "endereco": value[4],
+            }
+            tips.append(tip)
+        return tips
+    return []
+
 
 def buildInformation(values):
     result = []
     for value in values:
         buildData = {
-            "id": value[1],
-            "nome": value[0],
-            "idade": value[3],
-            "data_desaparecimento": value[4],
-            "parentesco": value[5],
-            "mensagem_de_aviso": value[6],
-            "mensagem_para_desaparecido": value[7],
-            "status_desaparecido": value[8],
-            "endereco": value[9],
+            "id": value[0],
+            "nome": value[1],
+            "idade": value[2],
+            "data_desaparecimento": value[3],
+            "parentesco": value[4],
+            "mensagem_de_aviso": value[5],
+            "mensagem_para_desaparecido": value[6],
+            "status_desaparecido": value[7],
+            "endereco": value[8],
             "user": {
-                "nome": value[14],
-                "email": value[12],
-                "telefone": value[13]
-            }
+                "id": value[9],
+                "email": value[10],
+                "telefone": value[11],
+                "nome": value[12],
+            },
+            "pistas": get_tips(value[0])
         }
         result.append(buildData)
     return result
 
-
-# @app.route('/api/allMissingPerson', methods=['GET'])
-# def get_all_missing_person():
-#     item = user_controller.get_all_missed_person()
-#     return (item)
-
-# body request with the data to save {
-#     "id": 1,            //Number
-#     "name": "janedoe",  //String
-#     "age": 25,          //Number
-# }
-@app.route('/api/missingPerson/save', methods=['POST'])
+@app.route('/api/missedPerson/save', methods=['POST'])
 def missing_person_save():
     body = request.get_json(force=True)
 
@@ -107,15 +132,20 @@ def missing_person_save():
     output = json.dumps(item)
     return success_handle(output)
 
-# @app.route('/api/missingPerson/update/<user_id>/<user_type>', methods=['PUT'])
-# def missing_person_update(user_id, user_type):
-#     output = user_controller.update_state_person_found(user_id, user_type)
-#     return (output)
+@app.route('/api/missedPerson/save/tip', methods=['POST'])
+def missing_person_save_tip():
+    body = request.get_json(force=True)
 
-# @app.route('/api/missingPerson/remove/<id>/<type>', methods=['PUT'])
-# def missing_person_soft_delete(id, type):
-#     output = user_controller.soft_delete_missed_person(id, type)
-#     return (output)
+    query = "INSERT INTO missing_finder.pistas_pessoa_desaparecida (nome, idade, descricao, endereco, pessoa_desaparecida_id) VALUES (%s, %s, %s, %s, %s)"
+
+    data = (body['nome'], body['idade'], body['descricao'], json.dumps(body['endereco']), body['pessoa_desaparecida_id'])
+
+    item = cur.execute(query, data)
+    conn.commit()
+ 
+    output = json.dumps(item)
+    return success_handle(output)
+
 
 # route to train a face
 @app.route('/api/train', methods=['POST'])
