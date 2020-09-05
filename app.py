@@ -50,7 +50,7 @@ def homepage():
 @app.route('/api/allMissedPerson', methods=['GET'])
 def missing_person():
     query = """
-        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.status_desaparecido, pd.endereco, u.id, u.email, u.telefone, u.nome_completp
+        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.status_desaparecido, pd.endereco, u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_desaparecida as pd 
         INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id
     """
@@ -61,7 +61,7 @@ def missing_person():
 @app.route('/api/missedPerson/<id>', methods=['GET'])
 def one_missing_person(id):
     query = """
-        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.status_desaparecido, pd.endereco, u.id, u.email, u.telefone, u.nome_completp
+        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.status_desaparecido, pd.endereco, u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_desaparecida as pd 
         INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id
         WHERE pd.id = %s
@@ -117,6 +117,20 @@ def buildInformation(values):
         }
         result.append(buildData)
     return result
+
+@app.route('/api/missedPerson/createDefaultUser', methods=['POST'])
+def missing_person_createDefaultUser():
+    body = request.get_json(force=True)
+
+    query = "INSERT INTO missing_finder.usuario (nome_usuario, email, senha, telefone, nome_completo) VALUES (%s, %s, %s, %s, %s)"
+
+    data = (body['nome_usuario'], body['email'], body['senha'], body['telefone'], body['nome_completo'])
+
+    item = cur.execute(query, data)
+    conn.commit()
+ 
+    output = json.dumps(item)
+    return success_handle(output)
 
 @app.route('/api/missedPerson/save', methods=['POST'])
 def missing_person_save():
