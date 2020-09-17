@@ -45,7 +45,7 @@ def create_tables():
             pessoa_achada_id int NOT NULL REFERENCES missing_finder.pessoa_achada(id),
             data TIMESTAMP NULL,
             descricao_pessoa varchar NULL,
-            descricao_lugar varchar NULL,
+            descricao varchar NULL,
             endereco json NULL
         );
         """,

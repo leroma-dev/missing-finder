@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 import psycopg2
 import json
 from datetime import datetime
-
+import asyncio
 
 
 app = Flask(__name__)
@@ -33,7 +33,7 @@ cur = conn.cursor()
 
 def get_tips(id):
     query = """
-        Select ppa.id, ppa.usuario_id, ppa.data, ppa.descricao_pessoa, ppa.descricao_lugar, ppa.endereco,
+        Select ppa.id, ppa.usuario_id, ppa.data, ppa.descricao_pessoa, ppa.descricao, ppa.endereco,
         u.id, u.email, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pistas_pessoa_achada as ppa
         INNER JOIN missing_finder.usuario u on u.id = ppa.usuario_id
@@ -50,7 +50,7 @@ def get_tips(id):
                 "usuario_id": value[1],
                 "data": value[2],
                 "descricao_pessoa": value[3],
-                "descricao_lugar": value[4],
+                "descricao": value[4],
                 "endereco": value[5],
                 "user": {
                     "id": value[6],
@@ -74,7 +74,6 @@ def buildInformationFoundPerson(values):
         }
         result.append(buildData)
     return result
-
 
 def buildInformationMissedPerson(values):
     result = []
@@ -183,30 +182,29 @@ def missing_person_save():
     output = json.dumps(item)
     return success_handle(output)
 
-@app.route('/api/missedPerson/save/found', methods=['POST'])
-def missing_person_save_found():
-    body = request.get_json(force=True)
+def missing_person_save_found(nome, idade):
+    query = "INSERT INTO missing_finder.pessoa_achada (nome, idade) VALUES (%s, %s) RETURNING id"
 
-    query = "INSERT INTO missing_finder.pessoa_achada (nome, idade) VALUES (%s, %s)"
+    data = (nome, idade)
 
-    data = (body['nome'], body['idade'])
-
-    item = cur.execute(query, data)
+    cur.execute(query, data)
     conn.commit()
- 
-    output = json.dumps(item)
-    return success_handle(output)
+    result = cur.fetchone()[0]
+
+    return result
 
 @app.route('/api/missedPerson/save/found/tip', methods=['POST'])
 def missing_person_save_tip():
     body = request.get_json(force=True)
 
     body['data'] = datetime.today()
-    print(body['data'])
 
-    query = "INSERT INTO missing_finder.pistas_pessoa_achada (usuario_id, data, descricao_pessoa, descricao_lugar, endereco, pessoa_achada_id) VALUES (%s, %s, %s, %s, %s, %s)"
+    if 'pessoa_achada_id' not in body:
+        body['pessoa_achada_id'] = missing_person_save_found(body['nome'], body['idade'])
 
-    data = (body['usuario_id'], body['data'], body['descricao_pessoa'], body['descricao_lugar'], json.dumps(body['endereco']), body['pessoa_achada_id'])
+    query = "INSERT INTO missing_finder.pistas_pessoa_achada (usuario_id, data, descricao_pessoa, descricao, endereco, pessoa_achada_id) VALUES (%s, %s, %s, %s, %s, %s)"
+
+    data = (body['usuario_id'], body['data'], body['descricao_pessoa'], body['descricao'], json.dumps(body['endereco']), body['pessoa_achada_id'])
 
     item = cur.execute(query, data)
     conn.commit()
