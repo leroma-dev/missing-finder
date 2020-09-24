@@ -128,9 +128,11 @@ def missing_person_save():
 
     item = cur.execute(query, data)
     conn.commit()
- 
-    output = json.dumps(item)
-    return success_handle(output)
+
+    if item == None:
+        return success_handle(json.dumps({
+            'message': 'pessoa desaparecida cadastrada com sucesso'
+        }))
 
 @app.route('/api/people/found', methods=['GET'])
 def missing_person_found():
@@ -162,8 +164,11 @@ def missing_person_save_found():
     item = cur.execute(query, data)
     conn.commit()
  
-    output = json.dumps(item)
-    return success_handle(output)
+    if item == None:
+        return success_handle(json.dumps({
+            'message': 'pessoa achada atualizada com sucesso'
+        }))
+
 
 @app.route('/api/people/found', methods=['POST'])
 def missing_person_update_found():
@@ -176,8 +181,11 @@ def missing_person_update_found():
     item = cur.execute(query, data)
     conn.commit()
  
-    output = json.dumps(item)
-    return success_handle(output)
+    if item == None:
+        return success_handle(json.dumps({
+            'message': 'pessoa achada cadastrada com sucesso'
+        }))
+
 
 # route to train a face
 @app.route('/api/train', methods=['POST'])
