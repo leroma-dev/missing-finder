@@ -31,38 +31,6 @@ conn = psycopg2.connect(
 )
 cur = conn.cursor()
 
-def get_tips(id):
-    query = """
-        Select ppa.id, ppa.usuario_id, ppa.data, ppa.descricao_pessoa, ppa.descricao, ppa.endereco,
-        u.id, u.email, u.email, u.telefone, u.nome_completo
-        FROM missing_finder.pistas_pessoa_achada as ppa
-        INNER JOIN missing_finder.usuario u on u.id = ppa.usuario_id
-        WHERE ppa.pessoa_achada_id = %s 
-    """
-    cur.execute(query, (str(id)))
-    result = cur.fetchall()
-
-    if result:
-        tips = []
-        for value in result:
-            tip = {
-                "id": value[0],
-                "usuario_id": value[1],
-                "data": value[2],
-                "descricao_pessoa": value[3],
-                "descricao": value[4],
-                "endereco": value[5],
-                "user": {
-                    "id": value[6],
-                    "email": value[7],
-                    "telefone": value[8],
-                    "nome": value[9],
-                },
-            }
-            tips.append(tip)
-        return tips
-    return []
-
 def buildInformationFoundPerson(values):
     result = []
     for value in values:
@@ -70,7 +38,7 @@ def buildInformationFoundPerson(values):
             "id": value[0],
             "nome": value[1],
             "idade": value[2],
-            "pistas": get_tips(value[0])
+            "tip": value[3]
         }
         result.append(buildData)
     return result
@@ -113,7 +81,7 @@ def homepage():
     output = json.dumps({"api": '1.0'})
     return success_handle(output)
 
-@app.route('/api/allMissedPerson', methods=['GET'])
+@app.route('/api/people/missed', methods=['GET'])
 def missing_person():
     query = """
         select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.endereco, u.id, u.email, u.telefone, u.nome_completo
@@ -124,7 +92,7 @@ def missing_person():
     result = cur.fetchall()
     return jsonify(buildInformationMissedPerson(result))
 
-@app.route('/api/missedPerson/<id>', methods=['GET'])
+@app.route('/api/people/missed/<id>', methods=['GET'])
 def one_missing_person(id):
     query = """
         select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.endereco, u.id, u.email, u.telefone, u.nome_completo
@@ -134,25 +102,7 @@ def one_missing_person(id):
     """
     cur.execute(query, (id))
     result = cur.fetchall()
-    return jsonify(buildInformationMissedPerson(result))
-
-@app.route('/api/allMissedPerson/found', methods=['GET'])
-def missing_person_found():
-    query = """
-        select id, nome, idade FROM missing_finder.pessoa_achada
-    """
-    cur.execute(query)
-    result = cur.fetchall()
-    return jsonify(buildInformationFoundPerson(result))
-
-@app.route('/api/missedPerson/found/<id>', methods=['GET'])
-def one_missing_person_found(id):
-    query = """
-        select id, nome, idade FROM missing_finder.pessoa_achada WHERE id = %s
-    """
-    cur.execute(query, (id))
-    result = cur.fetchall()
-    return jsonify(buildInformationFoundPerson(result))
+    return jsonify(buildInformationMissedPerson(result)[0])
 
 @app.route('/api/missedPerson/createDefaultUser', methods=['POST'])
 def missing_person_createDefaultUser():
@@ -168,7 +118,7 @@ def missing_person_createDefaultUser():
     output = json.dumps(item)
     return success_handle(output)
 
-@app.route('/api/missedPerson/save', methods=['POST'])
+@app.route('/api/people/missed', methods=['POST'])
 def missing_person_save():
     body = request.get_json(force=True)
 
@@ -182,29 +132,46 @@ def missing_person_save():
     output = json.dumps(item)
     return success_handle(output)
 
-def missing_person_save_found(nome, idade):
-    query = "INSERT INTO missing_finder.pessoa_achada (nome, idade) VALUES (%s, %s) RETURNING id"
+@app.route('/api/people/found', methods=['GET'])
+def missing_person_found():
+    query = """
+        select id, nome, idade, tip FROM missing_finder.pessoa_achada
+    """
+    cur.execute(query)
+    result = cur.fetchall()
+    return jsonify(buildInformationFoundPerson(result))
 
-    data = (nome, idade)
+@app.route('/api/people/found/<id>', methods=['GET'])
+def one_missing_person_found(id):
+    query = """
+        select id, nome, idade, tip FROM missing_finder.pessoa_achada WHERE id = %s
+    """
+    cur.execute(query, (id))
+    result = cur.fetchall()
+    return jsonify(buildInformationFoundPerson(result)[0])
 
-    cur.execute(query, data)
+@app.route('/api/people/found', methods=['PUT'])
+def missing_person_save_found():
+    body = request.get_json(force=True)
+    print(body)
+
+    query = "UPDATE missing_finder.pessoa_achada set tip = tip || %s::json where id = %s"
+
+    data = (json.dumps(body['tip']), body['id'])
+
+    item = cur.execute(query, data)
     conn.commit()
-    result = cur.fetchone()[0]
+ 
+    output = json.dumps(item)
+    return success_handle(output)
 
-    return result
-
-@app.route('/api/missedPerson/save/found/tip', methods=['POST'])
-def missing_person_save_tip():
+@app.route('/api/people/found', methods=['POST'])
+def missing_person_update_found():
     body = request.get_json(force=True)
 
-    body['data'] = datetime.today()
+    query = "INSERT INTO missing_finder.pessoa_achada (nome, idade, tip) VALUES (%s, %s, array[%s::json])"
 
-    if 'pessoa_achada_id' not in body:
-        body['pessoa_achada_id'] = missing_person_save_found(body['nome'], body['idade'])
-
-    query = "INSERT INTO missing_finder.pistas_pessoa_achada (usuario_id, data, descricao_pessoa, descricao, endereco, pessoa_achada_id) VALUES (%s, %s, %s, %s, %s, %s)"
-
-    data = (body['usuario_id'], body['data'], body['descricao_pessoa'], body['descricao'], json.dumps(body['endereco']), body['pessoa_achada_id'])
+    data = (body['nome'], body['idade'], json.dumps(body['tip']))
 
     item = cur.execute(query, data)
     conn.commit()

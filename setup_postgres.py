@@ -35,18 +35,8 @@ def create_tables():
         CREATE TABLE missing_finder.pessoa_achada (
             id serial PRIMARY KEY,
             nome varchar NULL,
-            idade INTEGER NULL
-        );
-        """,
-        """
-        CREATE TABLE missing_finder.pistas_pessoa_achada (
-            id serial PRIMARY KEY,
-            usuario_id INTEGER NOT NULL REFERENCES missing_finder.usuario(id),
-            pessoa_achada_id int NOT NULL REFERENCES missing_finder.pessoa_achada(id),
-            data TIMESTAMP NULL,
-            descricao_pessoa varchar NULL,
-            descricao varchar NULL,
-            endereco json NULL
+            idade INTEGER NULL,
+            tip json[] NULL
         );
         """,
         )
