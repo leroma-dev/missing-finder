@@ -161,6 +161,117 @@ def missing_person_save_tip():
     return success_handle(output)
 
 
+#
+#    <----    USER ENDPOINTS   ---->
+#
+
+# route to create application user
+@app.route('/api/users', methods=['POST'])
+def user_create():
+    body = request.get_json(force=True)
+
+    query = "INSERT INTO missing_finder.usuario (nome_usuario, email, senha, telefone, nome_completo) VALUES (%s, %s, %s, %s, %s)"
+
+    data = (body['nome_usuario'], body['email'], body['senha'], body['telefone'], body['nome_completo'])
+
+    item = cur.execute(query, data)
+    conn.commit()
+
+    output = json.dumps(item)
+    return success_handle(output)
+
+# route to select user by id
+@app.route('/api/users/<id>', methods=['GET'])
+def one_user_id(id):
+    query = """
+        select u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo
+        FROM missing_finder.usuario u
+        WHERE id = %s;
+    """
+    cur.execute(query, (id,))
+    result = cur.fetchall()
+    
+    return jsonify(buildUser(result))
+
+# route to update user fullname
+@app.route('/api/users/<int:id>/<nome_completo>', methods=['PATCH'])
+def change_fullname_user(id, nome_completo):
+    query = "UPDATE missing_finder.usuario set nome_completo = %s where id = %s"
+
+    item = cur.execute(query, (nome_completo, id,))
+    conn.commit()
+
+    output = json.dumps(item)
+    return success_handle(output)
+
+# route to update user email
+@app.route('/api/users/<int:id>/<email>', methods=['PATCH'])
+def change_email_user(id, email):
+    query = "UPDATE missing_finder.usuario set email = %s where id = %s"
+
+    item = cur.execute(query, (email, id,))
+    conn.commit()
+
+    output = json.dumps(item)
+    return success_handle(output)
+
+# route to update user phone
+@app.route('/api/users/<int:id>/<int:telefone>', methods=['PATCH'])
+def change_phone_user(id, telefone):
+    query = "UPDATE missing_finder.usuario set telefone = %s where id = %s"
+
+    item = cur.execute(query, (telefone, id,))
+    conn.commit()
+
+    output = json.dumps(item)
+    return success_handle(output)
+
+# route to update user phone
+@app.route('/api/users/<int:id>/<senha>', methods=['PATCH'])
+def change_password_user(id, senha):
+    query = "UPDATE missing_finder.usuario set senha = %s where id = %s"
+
+    item = cur.execute(query, (senha, id,))
+    conn.commit()
+
+    output = json.dumps(item)
+    return success_handle(output)
+
+# route to authentication login
+@app.route('/api/authentication', methods=['GET'])
+def one_user_username(nome_usuario):
+    query = """
+        select u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo
+        FROM missing_finder.usuario u
+        WHERE nome_usuario = '%s';
+    """
+    cur.execute(query, (nome_usuario,))
+    result = cur.fetchall()
+
+    return jsonify(buildUser(result))
+
+
+
+# Mount the info returned from users table
+def buildUser(values):
+    result = []
+    for value in values:
+        buildData = {
+            "id": value[0],
+            "nome_usuario": value[1],
+            "email": value[2],
+            "senha": value[3],
+            "telefone": value[4],
+            "nome_completo": value[5]
+        }
+        result.append(buildData)
+    return result
+
+
+#
+#   <----      FACE RECOGNITION ENDPOINTS     ---->
+#
+
 # route to train a face
 @app.route('/api/train', methods=['POST'])
 def train():
