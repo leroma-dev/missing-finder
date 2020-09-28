@@ -5,9 +5,10 @@ from libs.models.FaceBundle import FaceBundle
 from libs.S3Util import S3Util
 from os import path, getcwd
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 import json
-
+from flask_login import login_user, login_manager
 
 app = Flask(__name__)
 app.config.from_object('config.Config')
@@ -28,6 +29,9 @@ conn = psycopg2.connect(
     password = 'mysecretpassword'
 )
 cur = conn.cursor()
+
+# login_manager = LoginManager()
+# login_manager.init_app(app)
 
 def success_handle(output, status=200, mimetype='application/json'):
     return Response(output, status=status, mimetype=mimetype)
@@ -170,15 +174,22 @@ def missing_person_save_tip():
 def user_create():
     body = request.get_json(force=True)
 
+    body['senha'] = generate_password_hash(body['senha'], method='sha256')
+
     query = "INSERT INTO missing_finder.usuario (nome_usuario, email, senha, telefone, nome_completo) VALUES (%s, %s, %s, %s, %s)"
 
     data = (body['nome_usuario'], body['email'], body['senha'], body['telefone'], body['nome_completo'])
 
+    # still under testing
+    # data.senha = generate_password_hash(data.senha, method='sha256')
+
     item = cur.execute(query, data)
     conn.commit()
 
-    output = json.dumps(item)
-    return success_handle(output)
+    if item == None:
+        return success_handle(json.dumps({
+            'message': 'Usuário cadastrado com sucesso'
+        }))
 
 # route to select user by id
 @app.route('/api/users/<id>', methods=['GET'])
@@ -201,8 +212,10 @@ def change_fullname_user(id, nome_completo):
     item = cur.execute(query, (nome_completo, id,))
     conn.commit()
 
-    output = json.dumps(item)
-    return success_handle(output)
+    if item == None:
+        return success_handle(json.dumps({
+            'message': 'Nome completo do usuário atualizado com sucesso'
+        }))
 
 # route to update user email
 @app.route('/api/users/<int:id>/<email>', methods=['PATCH'])
@@ -212,8 +225,10 @@ def change_email_user(id, email):
     item = cur.execute(query, (email, id,))
     conn.commit()
 
-    output = json.dumps(item)
-    return success_handle(output)
+    if item == None:
+        return success_handle(json.dumps({
+            'message': 'Email do usuário atualizado com sucesso'
+        }))
 
 # route to update user phone
 @app.route('/api/users/<int:id>/<int:telefone>', methods=['PATCH'])
@@ -223,8 +238,10 @@ def change_phone_user(id, telefone):
     item = cur.execute(query, (telefone, id,))
     conn.commit()
 
-    output = json.dumps(item)
-    return success_handle(output)
+    if item == None:
+        return success_handle(json.dumps({
+            'message': 'Telefone do usuário atualizado com sucesso'
+        }))
 
 # route to update user phone
 @app.route('/api/users/<int:id>/<senha>', methods=['PATCH'])
@@ -234,12 +251,14 @@ def change_password_user(id, senha):
     item = cur.execute(query, (senha, id,))
     conn.commit()
 
-    output = json.dumps(item)
-    return success_handle(output)
+    if item == None:
+        return success_handle(json.dumps({
+            'message': 'Senha do usuário atualizado com sucesso'
+        }))
 
 # route to authentication login
-@app.route('/api/authentication', methods=['GET'])
-def one_user_username(nome_usuario):
+@app.route('/api/auth', methods=['GET'])
+def login(nome_usuario):
     query = """
         select u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo
         FROM missing_finder.usuario u
@@ -250,6 +269,27 @@ def one_user_username(nome_usuario):
 
     return jsonify(buildUser(result))
 
+# route to update user info
+@app.route('/api/users/<int:id>', methods=['PUT'])
+def user_update(id):
+    body = request.get_json(force=True)
+
+    body['senha'] = generate_password_hash(body['senha'], method='sha256')
+
+    query = """
+        UPDATE missing_finder.usuario set email = %s and senha = %s and telefone = %s and nome_completo = %s
+        where id = %s
+    """
+
+    data = (body['email'], body['senha'], body['telefone'], body['nome_completo'])
+
+    item = cur.execute(query, (data, id,))
+    conn.commit()
+
+    if item == None:
+        return success_handle(json.dumps({
+            'message': 'Usuário atualizado com sucesso'
+        }))
 
 
 # Mount the info returned from users table
