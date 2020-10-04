@@ -108,35 +108,30 @@ def one_missing_person(id):
     result = cur.fetchall()
     return jsonify(buildInformationMissedPerson(result)[0])
 
-@app.route('/api/missedPerson/createDefaultUser', methods=['POST'])
-def missing_person_createDefaultUser():
-    body = request.get_json(force=True)
-
-    query = "INSERT INTO missing_finder.usuario (nome_usuario, email, senha, telefone, nome_completo) VALUES (%s, %s, %s, %s, %s)"
-
-    data = (body['nome_usuario'], body['email'], body['senha'], body['telefone'], body['nome_completo'])
-
-    item = cur.execute(query, data)
-    conn.commit()
- 
-    output = json.dumps(item)
-    return success_handle(output)
-
 @app.route('/api/people/missed', methods=['POST'])
 def missing_person_save():
     body = request.get_json(force=True)
+    id = save_missed_person(body)
 
-    query = "INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+    train(body['input_path'], id)
+
+    if id:
+        return success_handle(json.dumps({
+            'message': 'Pessoa desaparecida cadastrada com sucesso.'
+        }))
+    else:
+        return error_handle("Não foi possível cadastrar a pessoa desaparecida.")
+
+def save_missed_person(body):
+    query = "INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id"
 
     data = (body['nome'], body['nascimento'], body['data_desaparecimento'], body['parentesco'], body['mensagem_de_aviso'], body['mensagem_para_desaparecido'], body['usuario_id'], json.dumps(body['endereco']))
 
-    item = cur.execute(query, data)
+    cur.execute(query, data)
+    id = cur.fetchone()[0]
     conn.commit()
 
-    if item == None:
-        return success_handle(json.dumps({
-            'message': 'pessoa desaparecida cadastrada com sucesso'
-        }))
+    return id
 
 @app.route('/api/people/found', methods=['GET'])
 def missing_person_found():
@@ -339,55 +334,19 @@ def buildUser(values):
 #
 
 # route to train a face
-@app.route('/api/train', methods=['POST'])
-def train():
-    return_output = json.dumps({"success": True})
+#@app.route('/api/face-attributes', methods=['POST'])
+def train(image_path, id):
+    #return_output = json.dumps({"success": True})
 
-    if 'file' not in request.files:
-        print("Face image is required")
-        return error_handle("Face image is required.")
+    if not image_path:
+        print("O caminho da imagem do rosto no S3 é obrigatório.")
+        return error_handle("O caminho da imagem do rosto no S3 é obrigatório.")
     else:
-        print("File request", request.files)
-        file = request.files['file']
-
-        if file.mimetype not in app.config['FILE_ALLOWED']:
-            print("File extension is not allowed")
-            return error_handle("Imagens suportadas: *.png , *.jpg")
-        else:
-            # get name in form data
-            # name = request.form['hash']
-            user_id = request.form['id']
-            name = request.form['name']
-            age = request.form['age']
-
-
-            print("Information of that face", name)
-            print("File is allowed and will be saved in AWS S3 bucket folder")
-
-            filename = secure_filename(name+'.jpg')
-            file_path = path.join('known/', filename)
-            file_content = file.read()
-
-            body = {"id": int(user_id), "name": name, "age": int(age)}
-            item = user_controller.save_missed_person(body)
-            output = json.dumps(item)
-
-            s3_path = "missing/" + user_id + "/" + filename
-
-            s3_util.upload_file(file_content=file_content, object_name=s3_path)
-
-            # faceBundle = app.face.addKnownFace(file_path, file_content=file_content)
-            faceBundle = app.face.addKnownFace(s3_path, file_content=file_content)
-
-            return_output = output + json.dumps(faceBundle.toData())
-            # return_output = json.dumps({"success": True, "name": name, "face": [json_data]}, indent=2, sort_keys=True)
-            #         return success_handle(return_output)
-            #         return error_handle("error message")
-    print(return_output)
-    return success_handle(return_output)
+        # faceBundle = app.face.addKnownFace(file_path, file_content=file_content)
+        faceBundle = app.face.addKnownFace(image_path, id)
 
 # route for recognize a unknown face
-@app.route('/api/recognize', methods=['POST'])
+@app.route('/api/face-recognition', methods=['POST'])
 def recognize():
     if 'file' not in request.files:
         return error_handle("Image or Video is required")
@@ -402,14 +361,19 @@ def recognize():
             return error_handle("File extension is not allowed")
         else:
             filename = secure_filename(file.filename)
-            file_path = path.join('unknown/', id+"_"+filename)
+            file_path = path.join('unknown/', id + "_" + filename)
             file_content = file.read()
 
-            s3_util.upload_file(file_content=file_content, object_name="unknown/"+id+"_"+filename)
+            s3_util.upload_file(file_content=file_content, object_name=file_path)
 
             name_list = app.face.findMatches(file_path, tolerance, id=id)
             if len(name_list):
-                return_output = json.dumps({"path": "S3 Bucket - ./output/result_"+id+".jpg", "name": [name_list]}, indent=2, sort_keys=True)
+                return_output = json.dumps(
+                    {
+                        "input_path": file_path,
+                        "output_path": "./output/result_" + id + ".jpg", 
+                        "name": [name_list]
+                    }, indent=2, sort_keys=True)
             else:
                 return error_handle("Face não reconhecida na imagem.")
         return success_handle(return_output)

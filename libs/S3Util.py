@@ -13,6 +13,15 @@ class S3Util:
         # Download file
         self.s3_client.download_fileobj(self.bucket, object_name, file_content)
 
+    def move_file(self, source_file_path, target_file_path):
+        copy_source = {
+            'Bucket': self.bucket,
+            'Key': source_file_path
+        }
+        
+        self.s3_client.copy(copy_source, self.bucket, target_file_path)
+        self.s3_client.delete_object(Bucket=self.bucket, Key=source_file_path)
+
     def upload_file(self, file_content, object_name=None):
         # Hash file content to calculate md5 checksum and send to AWS S3 verification
         hasher = hashlib.md5(file_content)

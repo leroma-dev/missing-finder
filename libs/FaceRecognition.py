@@ -145,8 +145,10 @@ class FaceRecognition:
     #                 print("Encoding Error on", filename)
     #         self.saveKnownFaces()
 
-    def addKnownFace(self, file_path, file_content) -> FaceBundle:
-        faceBundleList = self.__parseFaces(file_path)
+    def addKnownFace(self, source_file_path, id) -> FaceBundle:
+        target_file_path = 'missing/{}/reference.jpg'.format(id)
+        self.s3_util.move_file(source_file_path, target_file_path)
+        faceBundleList = self.__parseFaces(target_file_path)
         if len(faceBundleList):
             self.knownFaces.append(faceBundleList[0])
 #            self.saveKnownFaces()
