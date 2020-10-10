@@ -168,8 +168,8 @@ def get_one_found_person(id):
     result = cur.fetchall()
     return jsonify(buildInformationFoundPerson(result)[0])
 
-@app.route('/api/people/found/<id>', methods=['PUT'])
-def update_found_person(id):
+@app.route('/api/people/found/<id>', methods=['PATCH'])
+def add_tip_of_found_person(id):
     body = request.get_json(force=True)
 
     query = "UPDATE missing_finder.pessoa_achada set tip = tip || %s::json where id = %s"
