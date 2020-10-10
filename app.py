@@ -86,7 +86,7 @@ def homepage():
     return success_handle(output)
 
 @app.route('/api/people/missed', methods=['GET'])
-def missing_person():
+def get_all_missed_person():
     query = """
         select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.endereco, u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_desaparecida as pd 
@@ -97,7 +97,7 @@ def missing_person():
     return jsonify(buildInformationMissedPerson(result))
 
 @app.route('/api/people/missed/<id>', methods=['GET'])
-def one_missing_person(id):
+def get_one_missed_person(id):
     query = """
         select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.endereco, u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_desaparecida as pd 
@@ -109,20 +109,21 @@ def one_missing_person(id):
     return jsonify(buildInformationMissedPerson(result)[0])
 
 @app.route('/api/people/missed', methods=['POST'])
-def missing_person_save():
+def create_one_missed_person():
     body = request.get_json(force=True)
-    id = save_missed_person(body)
+    id = insert_missed_person(body)
 
-    train(body['input_path'], id)
+    train(body['input_path'], 'missed', id)
 
     if id:
         return success_handle(json.dumps({
+            'id': id,
             'message': 'Pessoa desaparecida cadastrada com sucesso.'
         }))
     else:
         return error_handle("Não foi possível cadastrar a pessoa desaparecida.")
 
-def save_missed_person(body):
+def insert_missed_person(body):
     query = "INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id"
 
     data = (body['nome'], body['nascimento'], body['data_desaparecimento'], body['parentesco'], body['mensagem_de_aviso'], body['mensagem_para_desaparecido'], body['usuario_id'], json.dumps(body['endereco']))
@@ -134,7 +135,7 @@ def save_missed_person(body):
     return id
 
 @app.route('/api/people/found', methods=['GET'])
-def missing_person_found():
+def get_all_found_person():
     query = """
         select id, nome, idade, tip FROM missing_finder.pessoa_achada
     """
@@ -143,7 +144,7 @@ def missing_person_found():
     return jsonify(buildInformationFoundPerson(result))
 
 @app.route('/api/people/found/<id>', methods=['GET'])
-def one_missing_person_found(id):
+def get_one_found_person(id):
     query = """
         select id, nome, idade, tip FROM missing_finder.pessoa_achada WHERE id = %s
     """
@@ -151,40 +152,48 @@ def one_missing_person_found(id):
     result = cur.fetchall()
     return jsonify(buildInformationFoundPerson(result)[0])
 
-@app.route('/api/people/found', methods=['PUT'])
-def missing_person_save_found():
+@app.route('/api/people/found/<id>', methods=['PUT'])
+def update_found_person(id):
     body = request.get_json(force=True)
-    print(body)
 
     query = "UPDATE missing_finder.pessoa_achada set tip = tip || %s::json where id = %s"
 
-    data = (json.dumps(body['tip']), body['id'])
+    data = (json.dumps(body['tip']), id)
 
     item = cur.execute(query, data)
     conn.commit()
  
     if item == None:
         return success_handle(json.dumps({
-            'message': 'pessoa achada atualizada com sucesso'
+            'message': 'Pessoa achada atualizada com sucesso.'
         }))
 
 
 @app.route('/api/people/found', methods=['POST'])
-def missing_person_update_found():
+def create_one_found_person():
     body = request.get_json(force=True)
+    id = insert_found_person(body)
 
-    query = "INSERT INTO missing_finder.pessoa_achada (nome, idade, tip) VALUES (%s, %s, array[%s::json])"
+    train(body['input_path'], 'found', id)
+
+    if id:
+        return success_handle(json.dumps({
+            'id': id,
+            'message': 'Pessoa achada cadastrada com sucesso.'
+        }))
+    else:
+        return error_handle("Não foi possível cadastrar a pessoa achada.")
+
+def insert_found_person(body):
+    query = "INSERT INTO missing_finder.pessoa_achada (nome, idade, tip) VALUES (%s, %s, array[%s::json]) RETURNING id"
 
     data = (body['nome'], body['idade'], json.dumps(body['tip']))
 
-    item = cur.execute(query, data)
+    cur.execute(query, data)
+    id = cur.fetchone()[0]
     conn.commit()
- 
-    if item == None:
-        return success_handle(json.dumps({
-            'message': 'pessoa achada cadastrada com sucesso'
-        }))
 
+    return id
 
 #
 #    <----    USER ENDPOINTS   ---->
@@ -335,30 +344,28 @@ def buildUser(values):
 
 # route to train a face
 #@app.route('/api/face-attributes', methods=['POST'])
-def train(image_path, id):
-    #return_output = json.dumps({"success": True})
-
+def train(image_path, person_type, id):
     if not image_path:
         print("O caminho da imagem do rosto no S3 é obrigatório.")
         return error_handle("O caminho da imagem do rosto no S3 é obrigatório.")
     else:
-        # faceBundle = app.face.addKnownFace(file_path, file_content=file_content)
-        faceBundle = app.face.addKnownFace(image_path, id)
+        faceBundle = app.face.addKnownFace(image_path, person_type, id)
 
 # route for recognize a unknown face
 @app.route('/api/face-recognition', methods=['POST'])
 def recognize():
     if 'file' not in request.files:
-        return error_handle("Image or Video is required")
+        return error_handle("Imagem obrigatória.")
     else:
         file = request.files['file']
         id = request.form['id']
+
         if 'tolerance' in request.form:
             tolerance = float(request.form['tolerance'])
         else:
             tolerance = 0.6
         if file.mimetype not in app.config['FILE_ALLOWED']:
-            return error_handle("File extension is not allowed")
+            return error_handle("Extensão de arquivo não permitida.")
         else:
             filename = secure_filename(file.filename)
             file_path = path.join('unknown/', id + "_" + filename)
@@ -375,7 +382,7 @@ def recognize():
                         "name": [name_list]
                     }, indent=2, sort_keys=True)
             else:
-                return error_handle("Face não reconhecida na imagem.")
+                return error_handle("Face da imagem não reconhecida.")
         return success_handle(return_output)
 
 # route to get image
