@@ -88,7 +88,7 @@ def homepage():
 @app.route('/api/people/missed', methods=['GET'])
 def get_all_missed_person():
     query = """
-        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.endereco, u.id, u.email, u.telefone, u.nome_completo
+        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.endereco, pd.ativo, u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_desaparecida as pd 
         INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id
     """
@@ -99,7 +99,7 @@ def get_all_missed_person():
 @app.route('/api/people/missed/<id>', methods=['GET'])
 def get_one_missed_person(id):
     query = """
-        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.endereco, u.id, u.email, u.telefone, u.nome_completo
+        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.endereco, pd.ativo, u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_desaparecida as pd 
         INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id
         WHERE pd.id = %s
@@ -124,7 +124,7 @@ def create_one_missed_person():
         return error_handle("Não foi possível cadastrar a pessoa desaparecida.")
 
 def insert_missed_person(body):
-    query = "INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id"
+    query = "INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco, ativo) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, true) RETURNING id"
 
     data = (body['nome'], body['nascimento'], body['data_desaparecimento'], body['parentesco'], body['mensagem_de_aviso'], body['mensagem_para_desaparecido'], body['usuario_id'], json.dumps(body['endereco']))
 
@@ -134,10 +134,26 @@ def insert_missed_person(body):
 
     return id
 
+@app.route('/api/people/missed/<id>', methods=['PATCH'])
+def deactivate_missed_person(id):
+    body = request.get_json(force=True)
+
+    query = "UPDATE missing_finder.pessoa_desaparecida SET ativo = %s WHERE id = %s"
+
+    data = (body['ativo'], id)
+
+    item = cur.execute(query, data)
+    conn.commit()
+
+    if item == None:
+        return success_handle(json.dumps({
+            'message': 'Status de ativação da pessoa desaparecida atualizado com sucesso.'
+        }))
+
 @app.route('/api/people/found', methods=['GET'])
 def get_all_found_person():
     query = """
-        select id, nome, idade, tip FROM missing_finder.pessoa_achada
+        select id, nome, idade, tip, ativo FROM missing_finder.pessoa_achada
     """
     cur.execute(query)
     result = cur.fetchall()
@@ -146,7 +162,7 @@ def get_all_found_person():
 @app.route('/api/people/found/<id>', methods=['GET'])
 def get_one_found_person(id):
     query = """
-        select id, nome, idade, tip FROM missing_finder.pessoa_achada WHERE id = %s
+        select id, nome, idade, tip, ativo FROM missing_finder.pessoa_achada WHERE id = %s
     """
     cur.execute(query, (id))
     result = cur.fetchall()
@@ -168,6 +184,21 @@ def update_found_person(id):
             'message': 'Pessoa achada atualizada com sucesso.'
         }))
 
+@app.route('/api/people/found/<id>', methods=['PATCH'])
+def deactivate_found_person(id):
+    body = request.get_json(force=True)
+
+    query = "UPDATE missing_finder.pessoa_achada SET ativo = %s WHERE id = %s"
+
+    data = (body['ativo'], id)
+
+    item = cur.execute(query, data)
+    conn.commit()
+
+    if item == None:
+        return success_handle(json.dumps({
+            'message': 'Status de ativação da pessoa achada atualizado com sucesso.'
+        }))
 
 @app.route('/api/people/found', methods=['POST'])
 def create_one_found_person():
@@ -185,7 +216,7 @@ def create_one_found_person():
         return error_handle("Não foi possível cadastrar a pessoa achada.")
 
 def insert_found_person(body):
-    query = "INSERT INTO missing_finder.pessoa_achada (nome, idade, tip) VALUES (%s, %s, array[%s::json]) RETURNING id"
+    query = "INSERT INTO missing_finder.pessoa_achada (nome, idade, tip, ativo) VALUES (%s, %s, array[%s::json], true) RETURNING id"
 
     data = (body['nome'], body['idade'], json.dumps(body['tip']))
 
