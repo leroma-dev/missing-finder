@@ -11,36 +11,37 @@ def create_tables():
         """
         CREATE TABLE missing_finder.usuario (
             id serial PRIMARY KEY,
-            nome_usuario varchar NULL,
-            email varchar NULL,
-            senha varchar NULL,
-            telefone int4 NULL,
-            nome_completo varchar NULL
+            nome_usuario VARCHAR NULL,
+            email VARCHAR NULL,
+            senha VARCHAR NULL,
+            telefone INT4 NULL,
+            nome_completo VARCHAR NULL
         );
         """,
         """
         CREATE TABLE missing_finder.pessoa_desaparecida (
             id serial PRIMARY KEY,
-            nome varchar NULL,
+            nome VARCHAR NULL,
             usuario_id INTEGER NOT NULL REFERENCES missing_finder.usuario(id),
-            nascimento date NULL,
-            data_desaparecimento date NULL,
-            parentesco varchar NULL,
-            mensagem_de_aviso varchar NULL,
-            mensagem_para_desaparecido varchar NULL,
-            ativo boolean NULL,
-            endereco json NULL,
-            encodings json NULL
+            nascimento DATE NULL,
+            idade INTEGER NULL,
+            data_desaparecimento DATE NULL,
+            parentesco VARCHAR NULL,
+            mensagem_de_aviso VARCHAR NULL,
+            mensagem_para_desaparecido VARCHAR NULL,
+            ativo BOOLEAN NULL,
+            endereco JSON NULL,
+            encoding JSON NULL
         );
         """,
         """
         CREATE TABLE missing_finder.pessoa_achada (
             id serial PRIMARY KEY,
-            nome varchar NULL,
+            nome VARCHAR NULL,
             idade INTEGER NULL,
-            ativo boolean NULL,
-            tip json[] NULL,
-            encodings json NULL
+            ativo BOOLEAN NULL,
+            tip JSON[] NULL,
+            encoding JSON NULL
         );
         """,
         )

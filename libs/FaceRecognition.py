@@ -5,6 +5,7 @@ import glob, os, codecs, json
 import face_recognition
 import io
 import tempfile
+import numpy as np
 
 class FaceRecognition:
     def __init__(self, storageFolderPath='storage/',
@@ -13,7 +14,8 @@ class FaceRecognition:
         outputFolderPath='output/',
         outputData='outputData.json',
         tolerance=0.6,
-        s3_util=None):
+        s3_util=None,
+        cur=None):
 
         self.storageFolderPath = storageFolderPath
         self.knownFolderPath = knownFolderPath
@@ -21,9 +23,9 @@ class FaceRecognition:
         self.outputFolderPath = outputFolderPath
 
         self.toleranceRate = tolerance
-        self.knownFaces = []
+        self.knownFaces = self.get_people_info(cur)
         self.s3_util = s3_util
-
+        
     #
     #   Generic
     #
@@ -54,7 +56,6 @@ class FaceRecognition:
         filename, file_extension = os.path.splitext(filename_w_ext)
 
         # Find faces in test image
-        # print ("image read:" + image_read)
         face_locations = face_recognition.face_locations(image_read)
         face_encodings = face_recognition.face_encodings(image_read, face_locations)
         face_landmarks = face_recognition.face_landmarks(image_read)
@@ -70,12 +71,13 @@ class FaceRecognition:
         return listFaces
 
     def __has_match(self, knownEncodings, faceBundle, tolerance, debug=True):
-        matches = face_recognition.compare_faces(knownEncodings, faceBundle.getEncodings(),
+        matches = face_recognition.compare_faces(np.asarray(knownEncodings), faceBundle.getEncodings(),
                                                  tolerance=tolerance)
+
         if debug:
             for i in range(0, len(self.knownFaces)):
                 if True == matches[i]:
-                    print(faceBundle.getName(), '==', self.knownFaces[i].getName())
+                    print(faceBundle.getName(), '==', self.knownFaces[i][1])
         return matches
 
     def __draw_image(self, drawInstance, faceBundle, label, drawBox=True, drawLandmarks=True, drawLabel=True):
@@ -114,6 +116,17 @@ class FaceRecognition:
         if face:
             self.knownFaces.append(face)
 
+    def build_recommendations_response(self, knownFace, output, similarity):
+        return {
+            "id": knownFace[0],
+            "nome": knownFace[1],
+            "idade": knownFace[2],
+            "encoding": knownFace[3],
+            "tipo": knownFace[4],
+            "output": output,
+            "similaridade": similarity
+        }
+
     def find_matches(self, filePath, tolerance, image_read=None, draw_matches=True, id='') -> list:
         faceList: list = []
 
@@ -133,20 +146,47 @@ class FaceRecognition:
         #   Prepare to Match
         knownFacesEncoding = []
         for knownFace in self.knownFaces:
-            knownFacesEncoding.append(knownFace.getEncodings())
+            knownFacesEncoding.append(knownFace[3])
 
         for faceBundle in faceBundleList:
+            recommendationsList: list = []
             matches = self.__has_match(knownFacesEncoding, faceBundle, tolerance)
+
             if draw_matches and len(matches) > 0 and True in matches:
-                first_match_index = matches.index(True)
-                name = self.knownFaces[first_match_index].getName()
-                self.__draw_image(draw, faceBundle, name, drawBox=True)
-                b = io.BytesIO()
-                pil_image.save(b, 'jpeg')
-                self.s3_util.upload_file(b.getvalue(), self.outputFolderPath+"result_"+id+".jpg")
-                faceBundle.set_is_known(True)
-            faceList.append(faceBundle.toData())
+                for i in range(0, len(matches)):
+                    tid = self.knownFaces[i][0]
+                    name = self.knownFaces[i][1]
+                    pencoding = self.knownFaces[i][3]
+
+                    self.__draw_image(draw, faceBundle, name, drawBox=True)
+
+                    b = io.BytesIO()
+                    pil_image.save(b, 'jpeg')
+
+                    output = self.outputFolderPath+"result_"+id+"_"+name+"_"+str(tid)+".jpg"
+                    similarity = 100 - face_recognition.face_distance(faceBundle.getEncodings().reshape(1,len(faceBundle.getEncodings())), np.asarray(pencoding))[0] * 100
+
+                    recommendationsList.append(self.build_recommendations_response(self.knownFaces[i], output, similarity))
+
+                    self.s3_util.upload_file(b.getvalue(), output)
+                    faceBundle.set_is_known(True)
+
+            jsonfb = json.loads(json.dumps(faceBundle.toData()))
+            jsonfb.update({"recommendations": recommendationsList})
+            faceList.append(jsonfb)
         return faceList
+
+    def get_people_info(self, cur):
+        query = """
+        SELECT pd.id, pd.nome, pd.idade, pd.encoding, 'DESAPARECIDA' FROM missing_finder.pessoa_desaparecida pd
+        UNION ALL
+        SELECT pa.id, pa.nome, pa.idade, pa.encoding, 'ACHADA' FROM missing_finder.pessoa_achada pa
+        """
+        
+        cur.execute(query)
+        result = cur.fetchall()
+        
+        return result
 
     def mark_face(self, face_id):
         file_list = glob.glob('result_{}_*.jpg'.format(face_id))
