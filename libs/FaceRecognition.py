@@ -53,13 +53,8 @@ class FaceRecognition:
     #
     #   Dada uma imagem, Retorna uma lista com todas as Faces presentes
     #
-    def __parseFaces(self, filePath, image_read=None) -> list:
+    def __parseFaces(self, filePath, image_read) -> list:
         listFaces: list = []
-        # Load test image to find faces in
-        if image_read is None:
-            with tempfile.TemporaryFile() as data:
-                self.s3_util.download_file(data, filePath)
-                image_read = face_recognition.load_image_file(data)
 
         # File Identification
         filename_w_ext = os.path.basename(filePath)
@@ -145,10 +140,13 @@ class FaceRecognition:
     #                 print("Encoding Error on", filename)
     #         self.saveKnownFaces()
 
-    def addKnownFace(self, source_file_path, person_type, id) -> FaceBundle:
-        target_file_path = '{}/{}/reference.jpg'.format(person_type, id)
-        self.s3_util.move_file(source_file_path, target_file_path)
-        faceBundleList = self.__parseFaces(target_file_path)
+    def addKnownFace(self, source_file_path) -> FaceBundle:
+        with tempfile.TemporaryFile() as data:
+            self.s3_util.download_file(data, source_file_path)
+            image_read = face_recognition.load_image_file(data)
+
+        faceBundleList = self.__parseFaces(source_file_path, image_read)
+        
         if len(faceBundleList):
             self.knownFaces.append(faceBundleList[0])
 #            self.saveKnownFaces()
@@ -161,15 +159,16 @@ class FaceRecognition:
     def findMatches(self, filePath, tolerance, image_read=None, draw_matches=True, id='') -> list:
         faceList: list = []
 
+        # Download image from S3
+        with tempfile.TemporaryFile() as data:
+            self.s3_util.download_file(data, filePath)
+            image_read = face_recognition.load_image_file(data)
+
         #   Find Faces
-        faceBundleList = self.__parseFaces(filePath)
+        faceBundleList = self.__parseFaces(filePath, image_read)
 
         #   Prepare to Draw
         if draw_matches:
-            if image_read is None:
-                with tempfile.TemporaryFile() as data:
-                    self.s3_util.download_file(data, filePath)
-                    image_read = face_recognition.load_image_file(data)
             pil_image = Image.fromarray(image_read)
             draw = ImageDraw.Draw(pil_image)
 
