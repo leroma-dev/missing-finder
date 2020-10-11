@@ -434,13 +434,12 @@ def buildUser(values):
 #
 
 # route to train a face
-#@app.route('/api/face-attributes', methods=['POST'])
 def train(image_path) -> FaceBundle:
     if not image_path:
         print("O caminho da imagem do rosto no S3 é obrigatório.")
         return error_handle("O caminho da imagem do rosto no S3 é obrigatório.")
     else:
-        return app.face.addKnownFace(image_path)
+        return app.face.add_known_face(image_path)
 
 # route for recognize a unknown face
 @app.route('/api/face-recognition', methods=['POST'])
@@ -464,7 +463,7 @@ def recognize():
 
             s3_util.upload_file(file_content=file_content, object_name=file_path)
 
-            name_list = app.face.findMatches(file_path, tolerance, id=id)
+            name_list = app.face.find_matches(file_path, tolerance, id=id)
             if len(name_list):
                 return_output = json.dumps(
                     {
@@ -475,40 +474,6 @@ def recognize():
             else:
                 return error_handle("Face da imagem não reconhecida.")
         return success_handle(return_output)
-
-# route to get image
-@app.route('/image/<string:rid>', methods=['GET'])
-def get_image(rid):
-    file_path = app.config['ASSETS']+'/output/result_{}.jpg'.format(rid)
-    # if parameter ?return=path
-    if request.args.get('return') == 'path':
-        # return path for image
-        return_output = json.dumps({"rid": rid, "path": file_path}, indent=2, sort_keys=True)
-        return success_handle(return_output)
-    else:
-        # return image
-        return send_file(file_path)
-
-# route to get image
-@app.route('/known/<string:id>', methods=['GET'])
-def get_known(id):
-    file_path = app.config['ASSETS']+'/known/{}.jpg'.format(id)
-    # return image
-    return send_file(file_path)
-
-# route to register facebundle list
-@app.route('/register-list', methods=['POST'])
-def register_list(face_list: list):
-    if isinstance(list, face_list):
-        for face in face_list:
-            if isinstance(FaceBundle, face):
-                app.face.add_known(face)
-            else:
-                error_handle('Not a Valid Path Variable')
-                return
-        success_handle('Done!')
-    else:
-        error_handle('Not a Valid Path Variable')
 
 # Run the app
 app.run(host=app.config['FLASK_RUN_HOST'], port=app.config['FLASK_RUN_PORT'])
