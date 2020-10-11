@@ -16,7 +16,7 @@ app = Flask(__name__)
 app.config.from_object('config.Config')
 
 assets: str = app.config['ASSETS']
-s3_util = S3Util('mantovanellos-bucket')
+s3_util = S3Util('missing-finder-bucket')
 app.face = FaceRecognition(storageFolderPath='storage/',
                            knownFolderPath='known/',
                            unknownFolderPath='unknown/',
