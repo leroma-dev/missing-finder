@@ -28,8 +28,9 @@ def create_tables():
             parentesco varchar NULL,
             mensagem_de_aviso varchar NULL,
             mensagem_para_desaparecido varchar NULL,
+            ativo boolean NULL,
             endereco json NULL,
-            ativo boolean NULL
+            encodings json NULL
         );
         """,
         """
@@ -37,8 +38,9 @@ def create_tables():
             id serial PRIMARY KEY,
             nome varchar NULL,
             idade INTEGER NULL,
+            ativo boolean NULL,
             tip json[] NULL,
-            ativo boolean NULL
+            encodings json NULL
         );
         """,
         )
