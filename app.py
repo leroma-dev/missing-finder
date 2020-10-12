@@ -10,7 +10,8 @@ import psycopg2
 import json
 from datetime import datetime
 import asyncio
-from flask_login import login_user, login_manager
+from flask_login import login_user, LoginManager
+import base64
 
 app = Flask(__name__)
 app.config.from_object('config.Config')
@@ -32,8 +33,8 @@ conn = psycopg2.connect(
 )
 cur = conn.cursor()
 
-# login_manager = LoginManager()
-# login_manager.init_app(app)
+login_manager = LoginManager()
+login_manager.init_app(app)
 
 def buildInformationFoundPerson(values):
     result = []
@@ -266,11 +267,15 @@ def one_user_id(id):
     return jsonify(buildUser(result))
 
 # route to update user fullname
-@app.route('/api/users/<int:id>/<nome_completo>', methods=['PATCH'])
-def change_fullname_user(id, nome_completo):
+@app.route('/api/users/<int:id>/fullname', methods=['PATCH'])
+def change_fullname_user(id):
+    body = request.get_json(force=True)
+
     query = "UPDATE missing_finder.usuario set nome_completo = %s where id = %s"
 
-    item = cur.execute(query, (nome_completo, id,))
+    data = (body['nome_completo'])
+    
+    item = cur.execute(query, (data, id,))
     conn.commit()
 
     if item == None:
@@ -279,11 +284,15 @@ def change_fullname_user(id, nome_completo):
         }))
 
 # route to update user email
-@app.route('/api/users/<int:id>/<email>', methods=['PATCH'])
-def change_email_user(id, email):
+@app.route('/api/users/<int:id>/email', methods=['PATCH'])
+def change_email_user(id):
+    body = request.get_json(force=True)
+
     query = "UPDATE missing_finder.usuario set email = %s where id = %s"
 
-    item = cur.execute(query, (email, id,))
+    data = (body['email'])
+
+    item = cur.execute(query, (data, id,))
     conn.commit()
 
     if item == None:
@@ -292,11 +301,15 @@ def change_email_user(id, email):
         }))
 
 # route to update user phone
-@app.route('/api/users/<int:id>/<int:telefone>', methods=['PATCH'])
-def change_phone_user(id, telefone):
+@app.route('/api/users/<int:id>/phone', methods=['PATCH'])
+def change_phone_user(id):
+    body = request.get_json(force=True)
+
     query = "UPDATE missing_finder.usuario set telefone = %s where id = %s"
 
-    item = cur.execute(query, (telefone, id,))
+    data = (body['telefone'])
+
+    item = cur.execute(query, (data, id,))
     conn.commit()
 
     if item == None:
@@ -304,12 +317,18 @@ def change_phone_user(id, telefone):
             'message': 'Telefone do usuário atualizado com sucesso'
         }))
 
-# route to update user phone
-@app.route('/api/users/<int:id>/<senha>', methods=['PATCH'])
-def change_password_user(id, senha):
+# route to update user password
+@app.route('/api/users/<int:id>/password', methods=['PATCH'])
+def change_password_user(id):
+    body = request.get_json(force=True)
+
+    body['senha'] = generate_password_hash(body['senha'], method='sha256')
+
     query = "UPDATE missing_finder.usuario set senha = %s where id = %s"
 
-    item = cur.execute(query, (senha, id,))
+    data = (body['senha'])
+
+    item = cur.execute(query, (data, id,))
     conn.commit()
 
     if item == None:
@@ -319,16 +338,31 @@ def change_password_user(id, senha):
 
 # route to authentication login
 @app.route('/api/auth', methods=['GET'])
-def login(nome_usuario):
-    query = """
-        select u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo
-        FROM missing_finder.usuario u
-        WHERE nome_usuario = '%s';
-    """
-    cur.execute(query, (nome_usuario,))
-    result = cur.fetchall()
+@login_manager.request_loader
+def login(request):
+    api_key = request.args.get('Authorization')
+    if api_key:
+        api_key = api_key.replace('Basic ', '', 1)
+        try:
+            api_key = base64.b64decode(api_key)
+        except TypeError:
+            pass
+        # user = User.query.filter_by(api_key=api_key).first()
+        # if user:
+        #     return user
+        print(api_key)
+    
+    return None
 
-    return jsonify(buildUser(result))
+    # query = """
+    #     select u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo
+    #     FROM missing_finder.usuario u
+    #     WHERE nome_usuario = '%s';
+    # """
+    # cur.execute(query, (nome_usuario,))
+    # result = cur.fetchall()
+
+    # return jsonify(buildUser(result))
 
 # route to update user info
 @app.route('/api/users/<int:id>', methods=['PUT'])
