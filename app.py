@@ -266,11 +266,15 @@ def one_user_id(id):
     return jsonify(buildUser(result))
 
 # route to update user fullname
-@app.route('/api/users/<int:id>/<nome_completo>', methods=['PATCH'])
-def change_fullname_user(id, nome_completo):
+@app.route('/api/users/<int:id>/fullname', methods=['PATCH'])
+def change_fullname_user(id):
+    body = request.get_json(force=True)
+
     query = "UPDATE missing_finder.usuario set nome_completo = %s where id = %s"
 
-    item = cur.execute(query, (nome_completo, id,))
+    data = (body['nome_completo'])
+    
+    item = cur.execute(query, (data, id,))
     conn.commit()
 
     if item == None:
@@ -279,11 +283,15 @@ def change_fullname_user(id, nome_completo):
         }))
 
 # route to update user email
-@app.route('/api/users/<int:id>/<email>', methods=['PATCH'])
-def change_email_user(id, email):
+@app.route('/api/users/<int:id>/email', methods=['PATCH'])
+def change_email_user(id):
+    body = request.get_json(force=True)
+
     query = "UPDATE missing_finder.usuario set email = %s where id = %s"
 
-    item = cur.execute(query, (email, id,))
+    data = (body['email'])
+
+    item = cur.execute(query, (data, id,))
     conn.commit()
 
     if item == None:
@@ -292,11 +300,15 @@ def change_email_user(id, email):
         }))
 
 # route to update user phone
-@app.route('/api/users/<int:id>/<int:telefone>', methods=['PATCH'])
-def change_phone_user(id, telefone):
+@app.route('/api/users/<int:id>/phone', methods=['PATCH'])
+def change_phone_user(id):
+    body = request.get_json(force=True)
+
     query = "UPDATE missing_finder.usuario set telefone = %s where id = %s"
 
-    item = cur.execute(query, (telefone, id,))
+    data = (body['telefone'])
+
+    item = cur.execute(query, (data, id,))
     conn.commit()
 
     if item == None:
@@ -304,12 +316,18 @@ def change_phone_user(id, telefone):
             'message': 'Telefone do usuário atualizado com sucesso'
         }))
 
-# route to update user phone
-@app.route('/api/users/<int:id>/<senha>', methods=['PATCH'])
-def change_password_user(id, senha):
+# route to update user password
+@app.route('/api/users/<int:id>/password', methods=['PATCH'])
+def change_password_user(id):
+    body = request.get_json(force=True)
+
+    body['senha'] = generate_password_hash(body['senha'], method='sha256')
+
     query = "UPDATE missing_finder.usuario set senha = %s where id = %s"
 
-    item = cur.execute(query, (senha, id,))
+    data = (body['senha'])
+
+    item = cur.execute(query, (data, id,))
     conn.commit()
 
     if item == None:
