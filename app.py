@@ -47,9 +47,11 @@ def buildInformationFoundPerson(values):
             "id": value[0],
             "nome": value[1],
             "idade": value[2],
+            "url_imagem": 'https://missing-finder-bucket.s3-sa-east-1.amazonaws.com/{}/{}/reference.jpg'.format('found', value[0]),
             "ativo": value[3],
             "tip": value[4],
-            "encoding": value[5]
+            "encoding": value[5],
+            "tipo": 'ACHADA'
         }
         result.append(buildData)
     return result
@@ -66,9 +68,11 @@ def buildInformationMissedPerson(values):
             "parentesco": value[5],
             "mensagem_de_aviso": value[6],
             "mensagem_para_desaparecido": value[7],
+            "url_imagem": 'https://missing-finder-bucket.s3-sa-east-1.amazonaws.com/{}/{}/reference.jpg'.format('missed', value[0]),
             "ativo": value[8],
             "endereco": value[9],
             "encoding": value[10],
+            "tipo": 'DESAPARECIDA',
             "user": {
                 "id": value[11],
                 "email": value[12],
