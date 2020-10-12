@@ -10,7 +10,8 @@ import psycopg2
 import json
 from datetime import datetime
 import asyncio
-from flask_login import login_user, login_manager
+from flask_login import login_user, LoginManager
+import base64
 
 app = Flask(__name__)
 app.config.from_object('config.Config')
@@ -32,8 +33,8 @@ conn = psycopg2.connect(
 )
 cur = conn.cursor()
 
-# login_manager = LoginManager()
-# login_manager.init_app(app)
+login_manager = LoginManager()
+login_manager.init_app(app)
 
 def buildInformationFoundPerson(values):
     result = []
