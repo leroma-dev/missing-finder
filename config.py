@@ -1,8 +1,7 @@
 from os import path, getcwd
 
-
 class Config:
-
+    BUCKET = 'mantovanellos-bucket'
     DEBUG = True
     FLASK_RUN_HOST = 'localhost'
     FLASK_RUN_PORT = 5000

@@ -1,17 +1,19 @@
+from .models.FaceBundle import FaceBundle
+from libs.S3Util import S3Util
 from PIL import Image, ImageDraw
 import glob, os, codecs, json
 import face_recognition
-
-from .models.FaceBundle import FaceBundle
-
+import io
+import tempfile
 
 class FaceRecognition:
-    def __init__(self, storageFolderPath='./storage/',
-                 knownFolderPath='./known/',
-                 unknownFolderPath='./unknown/',
-                 outputFolderPath='./output',
-                 outputData='outputData.json',
-                 tolerance=0.6):
+    def __init__(self, storageFolderPath='storage/',
+        knownFolderPath='known/',
+        unknownFolderPath='unknown/',
+        outputFolderPath='output/',
+        outputData='outputData.json',
+        tolerance=0.6,
+        s3_util=None):
 
         self.storageFolderPath = storageFolderPath
         self.knownFolderPath = knownFolderPath
@@ -22,6 +24,7 @@ class FaceRecognition:
         self.csvFile = outputData
         self.toleranceRate = tolerance
         self.knownFaces = []
+        self.s3_util = s3_util
 
 
         # if os.path.exists(self.faceBundleFile):
@@ -54,7 +57,9 @@ class FaceRecognition:
         listFaces: list = []
         # Load test image to find faces in
         if image_read is None:
-            image_read = face_recognition.load_image_file(filePath)
+            with tempfile.TemporaryFile() as data:
+                self.s3_util.download_file(data, filePath)
+                image_read = face_recognition.load_image_file(data)
 
         # File Identification
         filename_w_ext = os.path.basename(filePath)
@@ -76,9 +81,9 @@ class FaceRecognition:
             count += 1
         return listFaces
 
-    def __hasMatch(self, knownEncodings, faceBundle, debug=True):
+    def __hasMatch(self, knownEncodings, faceBundle, tolerance, debug=True):
         matches = face_recognition.compare_faces(knownEncodings, faceBundle.getEncodings(),
-                                                 tolerance=self.toleranceRate)
+                                                 tolerance=tolerance)
         if debug:
             for i in range(0, len(self.knownFaces)):
                 if True == matches[i]:
@@ -118,7 +123,7 @@ class FaceRecognition:
             top, right, bottom, left = face.getLocation()
             face_image = image[top:bottom, left:right]
             pil_image = Image.fromarray(face_image)
-            resultPath = "{}/{}.jpg".format(self.outputFolderPath, face.getName())
+            resultPath = "{}.jpg".format(face.getName())
             pil_image.save(resultPath)
         print("pullFaces -- {} Faces Found".format(len(listFaces)))
         print("pullFaces -- Done")
@@ -140,8 +145,10 @@ class FaceRecognition:
     #                 print("Encoding Error on", filename)
     #         self.saveKnownFaces()
 
-    def addKnownFace(self, filePath) -> FaceBundle:
-        faceBundleList = self.__parseFaces(filePath)
+    def addKnownFace(self, source_file_path, person_type, id) -> FaceBundle:
+        target_file_path = '{}/{}/reference.jpg'.format(person_type, id)
+        self.s3_util.move_file(source_file_path, target_file_path)
+        faceBundleList = self.__parseFaces(target_file_path)
         if len(faceBundleList):
             self.knownFaces.append(faceBundleList[0])
 #            self.saveKnownFaces()
@@ -151,16 +158,18 @@ class FaceRecognition:
         if face:
             self.knownFaces.append(face)
 
-    def findMatches(self, filePath, image_read=None, draw_matches=True, id='') -> list:
+    def findMatches(self, filePath, tolerance, image_read=None, draw_matches=True, id='') -> list:
         faceList: list = []
 
         #   Find Faces
-        faceBundleList = self.__parseFaces(filePath, image_read)
+        faceBundleList = self.__parseFaces(filePath)
 
         #   Prepare to Draw
         if draw_matches:
             if image_read is None:
-                image_read = face_recognition.load_image_file(filePath)
+                with tempfile.TemporaryFile() as data:
+                    self.s3_util.download_file(data, filePath)
+                    image_read = face_recognition.load_image_file(data)
             pil_image = Image.fromarray(image_read)
             draw = ImageDraw.Draw(pil_image)
 
@@ -170,12 +179,14 @@ class FaceRecognition:
             knownFacesEncoding.append(knownFace.getEncodings())
 
         for faceBundle in faceBundleList:
-            matches = self.__hasMatch(knownFacesEncoding, faceBundle)
+            matches = self.__hasMatch(knownFacesEncoding, faceBundle, tolerance)
             if draw_matches and len(matches) > 0 and True in matches:
                 first_match_index = matches.index(True)
                 name = self.knownFaces[first_match_index].getName()
                 self.__drawImage(draw, faceBundle, name, drawBox=True)
-                pil_image.save('{}/result_{}.jpg'.format(self.outputFolderPath, id))
+                b = io.BytesIO()
+                pil_image.save(b, 'jpeg')
+                self.s3_util.upload_file(b.getvalue(), self.outputFolderPath+"result_"+id+".jpg")
                 faceBundle.set_is_known(True)
             faceList.append(faceBundle.toData())
         return faceList
@@ -192,7 +203,7 @@ class FaceRecognition:
     #     csvFile.close()
 
     def mark_face(self, face_id):
-        file_list = glob.glob('{}/result_{}_*.jpg'.format(self.outputFolderPath, face_id))
+        file_list = glob.glob('result_{}_*.jpg'.format(face_id))
         file_count = 0
         for file in file_list:
             self.findMatches(file, id='{}_{}'.format(face_id, file_count))
