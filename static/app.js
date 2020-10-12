@@ -1,7 +1,5 @@
 var train_data = {
-    id: 0,
-    name: "",
-    age: 0,
+    hash: "",
     file: null
 };
 
@@ -65,29 +63,11 @@ $(document).ready(function(){
 
     });
 
-    //
-    // // listen for name change
-    // $('#hash-field').on('change', function(event){
-    //
-    //     train_data.hash = _.get(event, 'target.value', '');
-    //
-    // });
-    // listen for id change
-    $('#id-field').on('change', function(event){
 
-        train_data.id = _.get(event, 'target.value', '');
-
-    });
     // listen for name change
-    $('#name-field').on('change', function(event){
+    $('#hash-field').on('change', function(event){
 
-        train_data.name = _.get(event, 'target.value', '');
-
-    });
-    // listen for age change
-    $('#age-field').on('change', function(event){
-
-        train_data.age = _.get(event, 'target.value', '');
+        train_data.hash = _.get(event, 'target.value', '');
 
     });
 
@@ -121,24 +101,19 @@ $(document).ready(function(){
 
         message = null;
 
-        if(train_data.id && train_data.name && train_data.age && train_data.file){
-        // if(train_data.hash && train_data.file){
+        if(train_data.hash && train_data.file){
             // do send data to backend api
 
             var train_form_data = new FormData();
 
-            // train_form_data.append('hash', train_data.hash);
-            train_form_data.append('id', train_data.id);
-            train_form_data.append('name', train_data.name);
-            train_form_data.append('age', train_data.age);
+            train_form_data.append('hash', train_data.hash);
             train_form_data.append('file', train_data.file);
 
             axios.post('/api/train', train_form_data).then(function(response){
 
-                message = {type: 'success', message: 'Pessoa cadastrada'};
+                message = {type: 'success', message: 'Treinamento feito'};
 
-                // train_data = {hash: '', file: null};
-                train_data = {id: 0, name: "", age: 0, file: null};
+                train_data = {hash: '', file: null};
                 update();
 
             }).catch(function(error){
@@ -151,7 +126,7 @@ $(document).ready(function(){
 
         }else{
 
-            message = {type: "error", message: "Por favor informe todos os dados."}
+            message = {type: "error", message: "Hash e imagem da face necessários."}
 
 
             update();
