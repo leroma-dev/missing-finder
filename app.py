@@ -338,16 +338,31 @@ def change_password_user(id):
 
 # route to authentication login
 @app.route('/api/auth', methods=['GET'])
-def login(nome_usuario):
-    query = """
-        select u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo
-        FROM missing_finder.usuario u
-        WHERE nome_usuario = '%s';
-    """
-    cur.execute(query, (nome_usuario,))
-    result = cur.fetchall()
+@login_manager.request_loader
+def login(request):
+    api_key = request.args.get('Authorization')
+    if api_key:
+        api_key = api_key.replace('Basic ', '', 1)
+        try:
+            api_key = base64.b64decode(api_key)
+        except TypeError:
+            pass
+        # user = User.query.filter_by(api_key=api_key).first()
+        # if user:
+        #     return user
+        print(api_key)
+    
+    return None
 
-    return jsonify(buildUser(result))
+    # query = """
+    #     select u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo
+    #     FROM missing_finder.usuario u
+    #     WHERE nome_usuario = '%s';
+    # """
+    # cur.execute(query, (nome_usuario,))
+    # result = cur.fetchall()
+
+    # return jsonify(buildUser(result))
 
 # route to update user info
 @app.route('/api/users/<int:id>', methods=['PUT'])
