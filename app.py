@@ -10,19 +10,15 @@ import psycopg2
 import json
 from datetime import datetime
 import asyncio
-from flask_login import login_user, LoginManager
+from flask_login import login_user, login_manager
+from dateutil.relativedelta import relativedelta
 import base64
 
 app = Flask(__name__)
 app.config.from_object('config.Config')
 
 assets: str = app.config['ASSETS']
-s3_util = S3Util('mantovanellos-bucket')
-app.face = FaceRecognition(storageFolderPath='storage/',
-                           knownFolderPath='known/',
-                           unknownFolderPath='unknown/',
-                           outputFolderPath='output/',
-                           s3_util=s3_util)
+s3_util = S3Util('missing-finder-bucket')
 # app.face.parseKnownFaces()
 
 conn = psycopg2.connect(
@@ -32,6 +28,13 @@ conn = psycopg2.connect(
     password = 'mysecretpassword'
 )
 cur = conn.cursor()
+
+app.face = FaceRecognition(storageFolderPath='storage/',
+                           knownFolderPath='known/',
+                           unknownFolderPath='unknown/',
+                           outputFolderPath='output/',
+                           s3_util=s3_util,
+                           cur=cur)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -43,7 +46,11 @@ def buildInformationFoundPerson(values):
             "id": value[0],
             "nome": value[1],
             "idade": value[2],
-            "tip": value[3]
+            "url_imagem": 'https://missing-finder-bucket.s3-sa-east-1.amazonaws.com/{}/{}/reference.jpg'.format('found', value[0]),
+            "ativo": value[3],
+            "tip": value[4],
+            "encoding": value[5],
+            "tipo": 'ACHADA'
         }
         result.append(buildData)
     return result
@@ -54,17 +61,22 @@ def buildInformationMissedPerson(values):
         buildData = {
             "id": value[0],
             "nome": value[1],
-            "idade": value[2],
-            "data_desaparecimento": value[3],
-            "parentesco": value[4],
-            "mensagem_de_aviso": value[5],
-            "mensagem_para_desaparecido": value[6],
-            "endereco": value[7],
+            "data_nascimento": value[2],
+            "idade": value[3],
+            "data_desaparecimento": value[4],
+            "parentesco": value[5],
+            "mensagem_de_aviso": value[6],
+            "mensagem_para_desaparecido": value[7],
+            "url_imagem": 'https://missing-finder-bucket.s3-sa-east-1.amazonaws.com/{}/{}/reference.jpg'.format('missed', value[0]),
+            "ativo": value[8],
+            "endereco": value[9],
+            "encoding": value[10],
+            "tipo": 'DESAPARECIDA',
             "user": {
-                "id": value[8],
-                "email": value[9],
-                "telefone": value[10],
-                "nome": value[11],
+                "id": value[11],
+                "email": value[12],
+                "telefone": value[13],
+                "nome": value[14],
             },
         }
         result.append(buildData)
@@ -89,7 +101,7 @@ def homepage():
 @app.route('/api/people/missed', methods=['GET'])
 def get_all_missed_person():
     query = """
-        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.endereco, pd.ativo, u.id, u.email, u.telefone, u.nome_completo
+        select pd.id, pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encoding, u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_desaparecida as pd 
         INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id
     """
@@ -100,7 +112,7 @@ def get_all_missed_person():
 @app.route('/api/people/missed/<id>', methods=['GET'])
 def get_one_missed_person(id):
     query = """
-        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.endereco, pd.ativo, u.id, u.email, u.telefone, u.nome_completo
+        select pd.id, pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encoding, u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_desaparecida as pd 
         INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id
         WHERE pd.id = %s
@@ -112,9 +124,15 @@ def get_one_missed_person(id):
 @app.route('/api/people/missed', methods=['POST'])
 def create_one_missed_person():
     body = request.get_json(force=True)
-    id = insert_missed_person(body)
 
-    train(body['input_path'], 'missed', id)
+    source_file_path = body['input_path']
+
+    faceBundle = train(source_file_path)
+
+    id = insert_missed_person(body, faceBundle)
+
+    target_file_path = '{}/{}/reference.jpg'.format('missed', id)
+    s3_util.move_file(source_file_path, target_file_path)
 
     if id:
         return success_handle(json.dumps({
@@ -124,10 +142,10 @@ def create_one_missed_person():
     else:
         return error_handle("Não foi possível cadastrar a pessoa desaparecida.")
 
-def insert_missed_person(body):
-    query = "INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco, ativo) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, true) RETURNING id"
+def insert_missed_person(body, faceBundle):
+    query = "INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, idade, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco, ativo, encoding) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, true, %s::json) RETURNING id"
 
-    data = (body['nome'], body['nascimento'], body['data_desaparecimento'], body['parentesco'], body['mensagem_de_aviso'], body['mensagem_para_desaparecido'], body['usuario_id'], json.dumps(body['endereco']))
+    data = (body['nome'], body['nascimento'], relativedelta(datetime.today(), datetime.strptime(body['nascimento'], '%Y-%m-%d')).years, body['data_desaparecimento'], body['parentesco'], body['mensagem_de_aviso'], body['mensagem_para_desaparecido'], body['usuario_id'], json.dumps(body['endereco']), json.dumps(faceBundle.getEncodings().tolist()))
 
     cur.execute(query, data)
     id = cur.fetchone()[0]
@@ -154,7 +172,7 @@ def deactivate_missed_person(id):
 @app.route('/api/people/found', methods=['GET'])
 def get_all_found_person():
     query = """
-        select id, nome, idade, tip, ativo FROM missing_finder.pessoa_achada
+        select id, nome, idade, ativo, tip, encoding FROM missing_finder.pessoa_achada
     """
     cur.execute(query)
     result = cur.fetchall()
@@ -163,7 +181,7 @@ def get_all_found_person():
 @app.route('/api/people/found/<id>', methods=['GET'])
 def get_one_found_person(id):
     query = """
-        select id, nome, idade, tip, ativo FROM missing_finder.pessoa_achada WHERE id = %s
+        select id, nome, idade, ativo, tip, encoding FROM missing_finder.pessoa_achada WHERE id = %s
     """
     cur.execute(query, (id))
     result = cur.fetchall()
@@ -204,9 +222,15 @@ def deactivate_found_person(id):
 @app.route('/api/people/found', methods=['POST'])
 def create_one_found_person():
     body = request.get_json(force=True)
-    id = insert_found_person(body)
 
-    train(body['input_path'], 'found', id)
+    source_file_path = body['input_path']
+
+    faceBundle = train(source_file_path)
+
+    id = insert_found_person(body, faceBundle)
+
+    target_file_path = '{}/{}/reference.jpg'.format('found', id)
+    s3_util.move_file(source_file_path, target_file_path)
 
     if id:
         return success_handle(json.dumps({
@@ -216,10 +240,10 @@ def create_one_found_person():
     else:
         return error_handle("Não foi possível cadastrar a pessoa achada.")
 
-def insert_found_person(body):
-    query = "INSERT INTO missing_finder.pessoa_achada (nome, idade, tip, ativo) VALUES (%s, %s, array[%s::json], true) RETURNING id"
+def insert_found_person(body, faceBundle):
+    query = "INSERT INTO missing_finder.pessoa_achada (nome, idade, tip, ativo, encoding) VALUES (%s, %s, array[%s::json], true, %s::json) RETURNING id"
 
-    data = (body['nome'], body['idade'], json.dumps(body['tip']))
+    data = (body['nome'], body['idade'], json.dumps(body['tip']), json.dumps(faceBundle.getEncodings().tolist()))
 
     cur.execute(query, data)
     id = cur.fetchone()[0]
@@ -408,13 +432,12 @@ def buildUser(values):
 #
 
 # route to train a face
-#@app.route('/api/face-attributes', methods=['POST'])
-def train(image_path, person_type, id):
+def train(image_path) -> FaceBundle:
     if not image_path:
         print("O caminho da imagem do rosto no S3 é obrigatório.")
         return error_handle("O caminho da imagem do rosto no S3 é obrigatório.")
     else:
-        faceBundle = app.face.addKnownFace(image_path, person_type, id)
+        return app.face.add_known_face(image_path)
 
 # route for recognize a unknown face
 @app.route('/api/face-recognition', methods=['POST'])
@@ -438,51 +461,16 @@ def recognize():
 
             s3_util.upload_file(file_content=file_content, object_name=file_path)
 
-            name_list = app.face.findMatches(file_path, tolerance, id=id)
+            name_list = app.face.find_matches(file_path, tolerance, id=id)
             if len(name_list):
                 return_output = json.dumps(
                     {
                         "input_path": file_path,
-                        "output_path": "./output/result_" + id + ".jpg", 
-                        "name": [name_list]
+                        "name": name_list
                     }, indent=2, sort_keys=True)
             else:
                 return error_handle("Face da imagem não reconhecida.")
         return success_handle(return_output)
-
-# route to get image
-@app.route('/image/<string:rid>', methods=['GET'])
-def get_image(rid):
-    file_path = app.config['ASSETS']+'/output/result_{}.jpg'.format(rid)
-    # if parameter ?return=path
-    if request.args.get('return') == 'path':
-        # return path for image
-        return_output = json.dumps({"rid": rid, "path": file_path}, indent=2, sort_keys=True)
-        return success_handle(return_output)
-    else:
-        # return image
-        return send_file(file_path)
-
-# route to get image
-@app.route('/known/<string:id>', methods=['GET'])
-def get_known(id):
-    file_path = app.config['ASSETS']+'/known/{}.jpg'.format(id)
-    # return image
-    return send_file(file_path)
-
-# route to register facebundle list
-@app.route('/register-list', methods=['POST'])
-def register_list(face_list: list):
-    if isinstance(list, face_list):
-        for face in face_list:
-            if isinstance(FaceBundle, face):
-                app.face.add_known(face)
-            else:
-                error_handle('Not a Valid Path Variable')
-                return
-        success_handle('Done!')
-    else:
-        error_handle('Not a Valid Path Variable')
 
 # Run the app
 app.run(host=app.config['FLASK_RUN_HOST'], port=app.config['FLASK_RUN_PORT'])

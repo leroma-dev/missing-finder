@@ -5,7 +5,7 @@ import hashlib
 import logging
 
 class S3Util:
-    def __init__(self, bucket='mantovanellos-bucket'):
+    def __init__(self, bucket='missing-finder-bucket'):
         self.bucket = bucket
         self.s3_client = boto3.client('s3')
 
@@ -19,7 +19,7 @@ class S3Util:
             'Key': source_file_path
         }
         
-        self.s3_client.copy(copy_source, self.bucket, target_file_path)
+        self.s3_client.copy(CopySource=copy_source, Bucket=self.bucket, Key=target_file_path, ExtraArgs={'ACL': 'public-read'})
         self.s3_client.delete_object(Bucket=self.bucket, Key=source_file_path)
 
     def upload_file(self, file_content, object_name=None):
@@ -35,6 +35,6 @@ class S3Util:
         
         # Upload the file
         try:
-            self.s3_client.put_object(Body=file_content, Bucket=self.bucket, Key=object_name, ContentMD5=checksum, Metadata=metadata)
+            self.s3_client.put_object(ACL='public-read', Body=file_content, Bucket=self.bucket, Key=object_name, ContentMD5=checksum, Metadata=metadata)
         except ClientError as e:
             logging.error(e)
