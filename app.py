@@ -471,12 +471,12 @@ def recognize():
 
             s3_util.upload_file(file_content=file_content, object_name=file_path)
 
-            name_list = app.face.find_matches(file_path, tolerance, id=id)
-            if len(name_list):
+            result = app.face.find_matches(file_path, tolerance, id=id)
+            if len(result):
                 return_output = json.dumps(
                     {
                         "input_path": file_path,
-                        "name": name_list
+                        "result": result
                     }, indent=2, sort_keys=True)
             else:
                 return error_handle("Face da imagem não reconhecida.")

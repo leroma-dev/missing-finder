@@ -71,6 +71,7 @@ class FaceRecognition:
         return listFaces
 
     def __has_match(self, knownEncodings, faceBundle, tolerance, debug=True):
+        print('{0:.2f}'.format((1/(1+np.sqrt(np.sum(tolerance ** 2)))) * 100))
         matches = face_recognition.compare_faces(np.asarray(knownEncodings), faceBundle.getEncodings(),
                                                  tolerance=tolerance)
 
@@ -116,15 +117,16 @@ class FaceRecognition:
         if face:
             self.knownFaces.append(face)
 
-    def build_recommendations_response(self, knownFace, output, similarity):
+    def build_recommendations_response(self, tid, name, age, pencoding, ptype, image, output, similarity):
         return {
-            "id": knownFace[0],
-            "nome": knownFace[1],
-            "idade": knownFace[2],
-            "encoding": knownFace[3],
-            "tipo": knownFace[4],
+            "id": tid,
+            "name": name,
+            "age": age,
+            "encoding": pencoding,
+            "type": ptype,
+            "image": image,
             "output": output,
-            "similaridade": similarity
+            "similarity": similarity
         }
 
     def find_matches(self, filePath, tolerance, image_read=None, draw_matches=True, id='') -> list:
@@ -154,22 +156,30 @@ class FaceRecognition:
 
             if draw_matches and len(matches) > 0 and True in matches:
                 for i in range(0, len(matches)):
-                    tid = self.knownFaces[i][0]
-                    name = self.knownFaces[i][1]
-                    pencoding = self.knownFaces[i][3]
+                    if matches[i] == True:
+                        tid = self.knownFaces[i][0]
+                        name = self.knownFaces[i][1]
+                        age = self.knownFaces[i][2]
+                        pencoding = self.knownFaces[i][3]
+                        ptype = self.knownFaces[i][4]
 
-                    self.__draw_image(draw, faceBundle, name, drawBox=True)
+                        self.__draw_image(draw, faceBundle, name, drawBox=True)
 
-                    b = io.BytesIO()
-                    pil_image.save(b, 'jpeg')
+                        b = io.BytesIO()
+                        pil_image.save(b, 'jpeg')
 
-                    output = self.outputFolderPath+"result_"+id+"_"+name+"_"+str(tid)+".jpg"
-                    similarity = 100 - face_recognition.face_distance(faceBundle.getEncodings().reshape(1,len(faceBundle.getEncodings())), np.asarray(pencoding))[0] * 100
+                        if ptype == "DESAPARECIDA":
+                            image = "missed/"+str(tid)+"/"+"reference.jpg"
+                        else:
+                            image = "found/"+str(tid)+"/"+"reference.jpg"
+                        
+                        output = self.outputFolderPath+"result_"+id+"_"+name+"_"+str(tid)+".jpg"
+                        similarity = '{0:.2f}'.format((1/(1+np.sqrt(np.sum(face_recognition.face_distance(faceBundle.getEncodings().reshape(1,len(faceBundle.getEncodings())), np.asarray(pencoding))[0] ** 2)))) * 100)
 
-                    recommendationsList.append(self.build_recommendations_response(self.knownFaces[i], output, similarity))
+                        recommendationsList.append(self.build_recommendations_response(tid, name, age, pencoding, ptype, image, output, similarity))
 
-                    self.s3_util.upload_file(b.getvalue(), output)
-                    faceBundle.set_is_known(True)
+                        self.s3_util.upload_file(b.getvalue(), output)
+                        faceBundle.set_is_known(True)
 
             jsonfb = json.loads(json.dumps(faceBundle.toData()))
             jsonfb.update({"recommendations": recommendationsList})
