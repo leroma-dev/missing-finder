@@ -139,7 +139,7 @@ def create_one_missed_person():
 
     source_file_path = body['input_path']
 
-    faceBundle = train(source_file_path)
+    faceBundle = extract_face(source_file_path)
 
     id = insert_missed_person(body, faceBundle)
 
@@ -243,7 +243,7 @@ def create_one_found_person():
 
     source_file_path = body['input_path']
 
-    faceBundle = train(source_file_path)
+    faceBundle = extract_face(source_file_path)
 
     id = insert_found_person(body, faceBundle)
 
@@ -458,8 +458,7 @@ def buildUser(values):
 #   <----      FACE RECOGNITION ENDPOINTS     ---->
 #
 
-# route to train a face
-def train(image_path) -> FaceBundle:
+def extract_face(image_path) -> FaceBundle:
     if not image_path:
         print("O caminho da imagem do rosto no S3 é obrigatório.")
         return error_handle("O caminho da imagem do rosto no S3 é obrigatório.")
