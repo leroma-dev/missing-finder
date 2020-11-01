@@ -17,11 +17,12 @@ from dateutil.relativedelta import relativedelta
 
 app = Flask(__name__)
 app.config.from_object('config.Config')
-
 assets: str = app.config['ASSETS']
-s3_util = S3Util('missing-finder-bucket')
-# app.face.parseKnownFaces()
 
+# Instantiate S3 util class
+s3_util = S3Util('missing-finder-bucket')
+
+# Create cursor to PostgreSQL DB
 conn = psycopg2.connect(
     host = '127.0.0.1',
     database = 'postgres',
@@ -30,6 +31,7 @@ conn = psycopg2.connect(
 )
 cur = conn.cursor()
 
+# Instantiate FaceRecognition class
 app.face = FaceRecognition(storageFolderPath='storage/',
                            knownFolderPath='known/',
                            unknownFolderPath='unknown/',
@@ -37,6 +39,7 @@ app.face = FaceRecognition(storageFolderPath='storage/',
                            s3_util=s3_util,
                            cur=cur)
 
+# Instantiate login class
 login_manager = LoginManager()
 login_manager.init_app(app)
 
@@ -89,16 +92,22 @@ def success_handle(output, status=200, mimetype='application/json'):
 def error_handle(error_message, status=500, mimetype='application/json'):
     return Response(json.dumps({"error": error_message}), status=status, mimetype=mimetype)
 
-# route for homepage
+# Route for homepage
 @app.route('/', methods=['GET'])
 def page_home():
     return render_template('index.html')
 
+# Route for health check
 @app.route('/api', methods=['GET'])
 def homepage():
     output = json.dumps({"api": '1.0'})
     return success_handle(output)
 
+#
+#    <----    PEOPLE ENDPOINTS   ---->
+#
+
+# Route to get all missed people
 @app.route('/api/people/missed', methods=['GET'])
 def get_all_missed_person():
     query = """
@@ -110,6 +119,7 @@ def get_all_missed_person():
     result = cur.fetchall()
     return jsonify(buildInformationMissedPerson(result))
 
+# Route to get one missed person
 @app.route('/api/people/missed/<id>', methods=['GET'])
 def get_one_missed_person(id):
     query = """
@@ -122,6 +132,7 @@ def get_one_missed_person(id):
     result = cur.fetchall()
     return jsonify(buildInformationMissedPerson(result)[0])
 
+# Route to create one missed person
 @app.route('/api/people/missed', methods=['POST'])
 def create_one_missed_person():
     body = request.get_json(force=True)
@@ -154,7 +165,7 @@ def insert_missed_person(body, faceBundle):
 
     return id
 
-@app.route('/api/people/missed/<id>', methods=['PATCH'])
+# Route to update one missed person activation status
 def deactivate_missed_person(id):
     body = request.get_json(force=True)
 
@@ -170,6 +181,7 @@ def deactivate_missed_person(id):
             'message': 'Status de ativação da pessoa desaparecida atualizado com sucesso.'
         }))
 
+# Route to get all found people
 @app.route('/api/people/found', methods=['GET'])
 def get_all_found_person():
     query = """
@@ -179,6 +191,7 @@ def get_all_found_person():
     result = cur.fetchall()
     return jsonify(buildInformationFoundPerson(result))
 
+# Route to get one found person
 @app.route('/api/people/found/<id>', methods=['GET'])
 def get_one_found_person(id):
     query = """
@@ -188,6 +201,7 @@ def get_one_found_person(id):
     result = cur.fetchall()
     return jsonify(buildInformationFoundPerson(result)[0])
 
+# Route to update one found person with a tip
 @app.route('/api/people/found/<id>', methods=['PATCH'])
 def add_tip_of_found_person(id):
     body = request.get_json(force=True)
@@ -204,7 +218,7 @@ def add_tip_of_found_person(id):
             'message': 'Pessoa achada atualizada com sucesso.'
         }))
 
-@app.route('/api/people/found/<id>', methods=['PATCH'])
+# Route to update one found person activation status
 def deactivate_found_person(id):
     body = request.get_json(force=True)
 
@@ -220,6 +234,7 @@ def deactivate_found_person(id):
             'message': 'Status de ativação da pessoa achada atualizado com sucesso.'
         }))
 
+# Route to create one found person
 @app.route('/api/people/found', methods=['POST'])
 def create_one_found_person():
     body = request.get_json(force=True)
@@ -253,10 +268,10 @@ def insert_found_person(body, faceBundle):
     return id
 
 #
-#    <----    USER ENDPOINTS   ---->
+#    <----    USERS ENDPOINTS   ---->
 #
 
-# route to create application user
+# Route to create one user
 @app.route('/api/users', methods=['POST'])
 def user_create():
     body = request.get_json(force=True)
@@ -276,7 +291,7 @@ def user_create():
             'message': 'Usuário cadastrado com sucesso'
         }))
 
-# route to select user by id
+# Route to get one user
 @app.route('/api/users/<id>', methods=['GET'])
 def one_user_id(id):
     query = """
@@ -289,7 +304,7 @@ def one_user_id(id):
     
     return jsonify(buildUser(result))
 
-# route to update user fullname
+# Route to update one user fullname
 @app.route('/api/users/<int:id>/fullname', methods=['PATCH'])
 def change_fullname_user(id):
     body = request.get_json(force=True)
@@ -306,7 +321,7 @@ def change_fullname_user(id):
             'message': 'Nome completo do usuário atualizado com sucesso'
         }))
 
-# route to update user email
+# Route to update one user email
 @app.route('/api/users/<int:id>/email', methods=['PATCH'])
 def change_email_user(id):
     body = request.get_json(force=True)
@@ -323,7 +338,7 @@ def change_email_user(id):
             'message': 'Email do usuário atualizado com sucesso'
         }))
 
-# route to update user phone
+# Route to update one user phone
 @app.route('/api/users/<int:id>/phone', methods=['PATCH'])
 def change_phone_user(id):
     body = request.get_json(force=True)
@@ -340,7 +355,7 @@ def change_phone_user(id):
             'message': 'Telefone do usuário atualizado com sucesso'
         }))
 
-# route to update user password
+# Route to update one user password
 @app.route('/api/users/<int:id>/password', methods=['PATCH'])
 def change_password_user(id):
     body = request.get_json(force=True)
@@ -360,7 +375,7 @@ def change_password_user(id):
             'message': 'Senha do usuário atualizado com sucesso'
         }))
 
-# route to authentication login
+# Route to authenticate a user
 @app.route('/api/auth', methods=['GET'])
 @login_manager.request_loader
 def login():
@@ -398,7 +413,7 @@ def login():
     
     return None
 
-# route to update user info
+# Route to update one user informations
 @app.route('/api/users/<int:id>', methods=['PUT'])
 def user_update(id):
     body = request.get_json(force=True)
@@ -449,7 +464,7 @@ def train(image_path) -> FaceBundle:
     else:
         return app.face.add_known_face(image_path)
 
-# route for recognize a unknown face
+# Route to recognize a unknown face
 @app.route('/api/face-recognition', methods=['POST'])
 def recognize():
     if 'file' not in request.files:
