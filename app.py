@@ -13,17 +13,13 @@ import asyncio
 from flask_login import login_user, LoginManager
 import base64
 import hashlib
+from dateutil.relativedelta import relativedelta
 
 app = Flask(__name__)
 app.config.from_object('config.Config')
 
 assets: str = app.config['ASSETS']
 s3_util = S3Util('missing-finder-bucket')
-app.face = FaceRecognition(storageFolderPath='storage/',
-                           knownFolderPath='known/',
-                           unknownFolderPath='unknown/',
-                           outputFolderPath='output/',
-                           s3_util=s3_util)
 # app.face.parseKnownFaces()
 
 conn = psycopg2.connect(
@@ -33,6 +29,13 @@ conn = psycopg2.connect(
     password = 'mysecretpassword'
 )
 cur = conn.cursor()
+
+app.face = FaceRecognition(storageFolderPath='storage/',
+                           knownFolderPath='known/',
+                           unknownFolderPath='unknown/',
+                           outputFolderPath='output/',
+                           s3_util=s3_util,
+                           cur=cur)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -46,7 +49,7 @@ def buildInformationFoundPerson(values):
             "idade": value[2],
             "ativo": value[3],
             "tip": value[4],
-            "encodings": value[5]
+            "encoding": value[5]
         }
         result.append(buildData)
     return result
@@ -57,19 +60,20 @@ def buildInformationMissedPerson(values):
         buildData = {
             "id": value[0],
             "nome": value[1],
-            "idade": value[2],
-            "data_desaparecimento": value[3],
-            "parentesco": value[4],
-            "mensagem_de_aviso": value[5],
-            "mensagem_para_desaparecido": value[6],
-            "ativo": value[7],
-            "endereco": value[8],
-            "encodings": value[9],
+            "data_nascimento": value[2],
+            "idade": value[3],
+            "data_desaparecimento": value[4],
+            "parentesco": value[5],
+            "mensagem_de_aviso": value[6],
+            "mensagem_para_desaparecido": value[7],
+            "ativo": value[8],
+            "endereco": value[9],
+            "encoding": value[10],
             "user": {
-                "id": value[10],
-                "email": value[11],
-                "telefone": value[12],
-                "nome": value[13],
+                "id": value[11],
+                "email": value[12],
+                "telefone": value[13],
+                "nome": value[14],
             },
         }
         result.append(buildData)
@@ -94,7 +98,7 @@ def homepage():
 @app.route('/api/people/missed', methods=['GET'])
 def get_all_missed_person():
     query = """
-        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encodings, u.id, u.email, u.telefone, u.nome_completo
+        select pd.id, pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encoding, u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_desaparecida as pd 
         INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id
     """
@@ -105,7 +109,7 @@ def get_all_missed_person():
 @app.route('/api/people/missed/<id>', methods=['GET'])
 def get_one_missed_person(id):
     query = """
-        select pd.id, pd.nome, pd.nascimento, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encodings, u.id, u.email, u.telefone, u.nome_completo
+        select pd.id, pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encoding, u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_desaparecida as pd 
         INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id
         WHERE pd.id = %s
@@ -136,9 +140,9 @@ def create_one_missed_person():
         return error_handle("Não foi possível cadastrar a pessoa desaparecida.")
 
 def insert_missed_person(body, faceBundle):
-    query = "INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco, ativo, encodings) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, true, %s::json) RETURNING id"
+    query = "INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, idade, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco, ativo, encoding) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, true, %s::json) RETURNING id"
 
-    data = (body['nome'], body['nascimento'], body['data_desaparecimento'], body['parentesco'], body['mensagem_de_aviso'], body['mensagem_para_desaparecido'], body['usuario_id'], json.dumps(body['endereco']), json.dumps(faceBundle.getEncodings().tolist()))
+    data = (body['nome'], body['nascimento'], relativedelta(datetime.today(), datetime.strptime(body['nascimento'], '%Y-%m-%d')).years, body['data_desaparecimento'], body['parentesco'], body['mensagem_de_aviso'], body['mensagem_para_desaparecido'], body['usuario_id'], json.dumps(body['endereco']), json.dumps(faceBundle.getEncodings().tolist()))
 
     cur.execute(query, data)
     id = cur.fetchone()[0]
@@ -165,7 +169,7 @@ def deactivate_missed_person(id):
 @app.route('/api/people/found', methods=['GET'])
 def get_all_found_person():
     query = """
-        select id, nome, idade, ativo, tip, encodings FROM missing_finder.pessoa_achada
+        select id, nome, idade, ativo, tip, encoding FROM missing_finder.pessoa_achada
     """
     cur.execute(query)
     result = cur.fetchall()
@@ -174,7 +178,7 @@ def get_all_found_person():
 @app.route('/api/people/found/<id>', methods=['GET'])
 def get_one_found_person(id):
     query = """
-        select id, nome, idade, ativo, tip, encodings FROM missing_finder.pessoa_achada WHERE id = %s
+        select id, nome, idade, ativo, tip, encoding FROM missing_finder.pessoa_achada WHERE id = %s
     """
     cur.execute(query, (id))
     result = cur.fetchall()
@@ -234,7 +238,7 @@ def create_one_found_person():
         return error_handle("Não foi possível cadastrar a pessoa achada.")
 
 def insert_found_person(body, faceBundle):
-    query = "INSERT INTO missing_finder.pessoa_achada (nome, idade, tip, ativo, encodings) VALUES (%s, %s, array[%s::json], true, %s::json) RETURNING id"
+    query = "INSERT INTO missing_finder.pessoa_achada (nome, idade, tip, ativo, encoding) VALUES (%s, %s, array[%s::json], true, %s::json) RETURNING id"
 
     data = (body['nome'], body['idade'], json.dumps(body['tip']), json.dumps(faceBundle.getEncodings().tolist()))
 
@@ -468,8 +472,7 @@ def recognize():
                 return_output = json.dumps(
                     {
                         "input_path": file_path,
-                        "output_path": "./output/result_" + id + ".jpg", 
-                        "name": [name_list]
+                        "name": name_list
                     }, indent=2, sort_keys=True)
             else:
                 return error_handle("Face da imagem não reconhecida.")
