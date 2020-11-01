@@ -301,7 +301,10 @@ def one_user_id(id):
         FROM missing_finder.usuario u
         WHERE id = %s;
     """
-    cur.execute(query, (id,))
+
+    data = (id)
+
+    cur.execute(query, data)
     result = cur.fetchall()
     
     return jsonify(buildUser(result))
@@ -313,9 +316,9 @@ def change_fullname_user(id):
 
     query = "UPDATE missing_finder.usuario set nome_completo = %s where id = %s"
 
-    data = (body['nome_completo'])
+    data = (body['nome_completo'], id)
     
-    item = cur.execute(query, (data, id,))
+    item = cur.execute(query, data)
     conn.commit()
 
     if item == None:
@@ -330,9 +333,9 @@ def change_email_user(id):
 
     query = "UPDATE missing_finder.usuario set email = %s where id = %s"
 
-    data = (body['email'])
+    data = (body['email'], id)
 
-    item = cur.execute(query, (data, id,))
+    item = cur.execute(query, data)
     conn.commit()
 
     if item == None:
@@ -347,9 +350,9 @@ def change_phone_user(id):
 
     query = "UPDATE missing_finder.usuario set telefone = %s where id = %s"
 
-    data = (body['telefone'])
+    data = (body['telefone'], id)
 
-    item = cur.execute(query, (data, id,))
+    item = cur.execute(query, data)
     conn.commit()
 
     if item == None:
@@ -367,9 +370,9 @@ def change_password_user(id):
 
     query = "UPDATE missing_finder.usuario set senha = %s where id = %s"
 
-    data = (body['senha'])
+    data = (body['senha'], id)
 
-    item = cur.execute(query, (data, id,))
+    item = cur.execute(query, data)
     conn.commit()
 
     if item == None:
@@ -420,16 +423,15 @@ def login():
 def user_update(id):
     body = request.get_json(force=True)
 
-    body['senha'] = generate_password_hash(body['senha'], method='sha256')
-
     query = """
-        UPDATE missing_finder.usuario set email = %s and senha = %s and telefone = %s and nome_completo = %s
-        where id = %s
+        UPDATE missing_finder.usuario u
+        SET u.email = %s, u.senha = %s, u.telefone = %s, u.nome_completo = %s
+        WHERE u.id = %s
     """
 
-    data = (body['email'], body['senha'], body['telefone'], body['nome_completo'])
+    data = (body['email'], hashlib.sha256(body['senha'].encode()).hexdigest(), body['telefone'], body['nome_completo'], id)
 
-    item = cur.execute(query, (data, id,))
+    item = cur.execute(query, data)
     conn.commit()
 
     if item == None:
