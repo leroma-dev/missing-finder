@@ -14,7 +14,7 @@ def create_tables():
             nome_usuario VARCHAR NULL,
             email VARCHAR NULL,
             senha VARCHAR NULL,
-            telefone INT4 NULL,
+            telefone VARCHAR NULL,
             nome_completo VARCHAR NULL
         );
         """,
