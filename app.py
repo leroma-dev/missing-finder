@@ -111,9 +111,9 @@ def homepage():
 @app.route('/api/people/missed', methods=['GET'])
 def get_all_missed_person():
     query = """
-        select pd.id, pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encoding, u.id, u.email, u.telefone, u.nome_completo
-        FROM missing_finder.pessoa_desaparecida as pd 
-        INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id
+        SELECT pd.id, pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encoding, u.id, u.email, u.telefone, u.nome_completo
+        FROM missing_finder.pessoa_desaparecida pd 
+        INNER JOIN missing_finder.usuario u ON pd.usuario_id = u.id
     """
     cur.execute(query)
     result = cur.fetchall()
@@ -123,9 +123,9 @@ def get_all_missed_person():
 @app.route('/api/people/missed/<id>', methods=['GET'])
 def get_one_missed_person(id):
     query = """
-        select pd.id, pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encoding, u.id, u.email, u.telefone, u.nome_completo
-        FROM missing_finder.pessoa_desaparecida as pd 
-        INNER JOIN missing_finder.usuario u on pd.usuario_id = u.id
+        SELECT pd.id, pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encoding, u.id, u.email, u.telefone, u.nome_completo
+        FROM missing_finder.pessoa_desaparecida pd 
+        INNER JOIN missing_finder.usuario u ON pd.usuario_id = u.id
         WHERE pd.id = %s
     """
     cur.execute(query, (id))
@@ -155,7 +155,11 @@ def create_one_missed_person():
         return error_handle("Não foi possível cadastrar a pessoa desaparecida.")
 
 def insert_missed_person(body, faceBundle):
-    query = "INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, idade, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco, ativo, encoding) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, true, %s::json) RETURNING id"
+    query = """
+        INSERT INTO missing_finder.pessoa_desaparecida pd (pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.usuario_id, pd.endereco, pd.ativo, pd.encoding)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, true, %s::json)
+        RETURNING pd.id
+    """
 
     data = (body['nome'], body['nascimento'], relativedelta(datetime.today(), datetime.strptime(body['nascimento'], '%Y-%m-%d')).years, body['data_desaparecimento'], body['parentesco'], body['mensagem_de_aviso'], body['mensagem_para_desaparecido'], body['usuario_id'], json.dumps(body['endereco']), json.dumps(faceBundle.getEncodings().tolist()))
 
@@ -170,7 +174,11 @@ def insert_missed_person(body, faceBundle):
 def deactivate_missed_person(id):
     body = request.get_json(force=True)
 
-    query = "UPDATE missing_finder.pessoa_desaparecida SET ativo = %s WHERE id = %s"
+    query = """
+        UPDATE missing_finder.pessoa_desaparecida pd
+        SET pd.ativo = %s
+        WHERE pd.id = %s]
+    """
 
     data = (body['ativo'], id)
 
@@ -186,7 +194,7 @@ def deactivate_missed_person(id):
 @app.route('/api/people/found', methods=['GET'])
 def get_all_found_person():
     query = """
-        select id, nome, idade, ativo, tip, encoding FROM missing_finder.pessoa_achada
+        SELECT pa.id, pa.nome, pa.idade, pa.ativo, pa.tip, pa.encoding FROM missing_finder.pessoa_achada pa
     """
     cur.execute(query)
     result = cur.fetchall()
@@ -196,7 +204,9 @@ def get_all_found_person():
 @app.route('/api/people/found/<id>', methods=['GET'])
 def get_one_found_person(id):
     query = """
-        select id, nome, idade, ativo, tip, encoding FROM missing_finder.pessoa_achada WHERE id = %s
+        SELECT pa.id, pa.nome, pa.idade, pa.ativo, pa.tip, pa.encoding
+        FROM missing_finder.pessoa_achada pa
+        WHERE id = %s
     """
     cur.execute(query, (id))
     result = cur.fetchall()
@@ -207,7 +217,11 @@ def get_one_found_person(id):
 def add_tip_of_found_person(id):
     body = request.get_json(force=True)
 
-    query = "UPDATE missing_finder.pessoa_achada set tip = tip || %s::json where id = %s"
+    query = """
+        UPDATE missing_finder.pessoa_achada pa
+        SET pa.tip = pa.tip || %s::json
+        WHERE pa.id = %s
+    """
 
     data = (json.dumps(body['tip']), id)
 
@@ -224,7 +238,11 @@ def add_tip_of_found_person(id):
 def deactivate_found_person(id):
     body = request.get_json(force=True)
 
-    query = "UPDATE missing_finder.pessoa_achada SET ativo = %s WHERE id = %s"
+    query = """
+        UPDATE missing_finder.pessoa_achada pa
+        SET pa.ativo = %s
+        WHERE pa.id = %s
+    """
 
     data = (body['ativo'], id)
 
@@ -259,7 +277,11 @@ def create_one_found_person():
         return error_handle("Não foi possível cadastrar a pessoa achada.")
 
 def insert_found_person(body, faceBundle):
-    query = "INSERT INTO missing_finder.pessoa_achada (nome, idade, tip, ativo, encoding) VALUES (%s, %s, array[%s::json], true, %s::json) RETURNING id"
+    query = """
+        INSERT INTO missing_finder.pessoa_achada pa (pa.nome, pa.idade, pa.tip, pa.ativo, pa.encoding)
+        VALUES (%s, %s, array[%s::json], true, %s::json)
+        RETURNING pa.id
+    """
 
     data = (body['nome'], body['idade'], json.dumps(body['tip']), json.dumps(faceBundle.getEncodings().tolist()))
 
@@ -281,7 +303,10 @@ def user_create():
     pass_hash = hashlib.sha256(body['senha'].encode())
     body['senha'] = pass_hash.hexdigest()
 
-    query = "INSERT INTO missing_finder.usuario (nome_usuario, email, senha, telefone, nome_completo) VALUES (%s, %s, %s, %s, %s)"
+    query = """
+        INSERT INTO missing_finder.usuario u (u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo)
+        VALUES (%s, %s, %s, %s, %s)
+    """
 
     data = (body['nome_usuario'], body['email'], body['senha'], body['telefone'], body['nome_completo'])
     print(data)
@@ -290,16 +315,16 @@ def user_create():
 
     if item == None:
         return success_handle(json.dumps({
-            'message': 'Usuário cadastrado com sucesso'
+            'message': 'Usuário cadastrado com sucesso.'
         }))
 
 # Route to get one user
 @app.route('/api/users/<id>', methods=['GET'])
 def one_user_id(id):
     query = """
-        select u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo
+        SELECT u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo
         FROM missing_finder.usuario u
-        WHERE id = %s;
+        WHERE u.id = %s;
     """
 
     data = (id)
@@ -314,7 +339,11 @@ def one_user_id(id):
 def change_fullname_user(id):
     body = request.get_json(force=True)
 
-    query = "UPDATE missing_finder.usuario set nome_completo = %s where id = %s"
+    query = """
+        UPDATE missing_finder.usuario u
+        SET u.nome_completo = %s
+        WHERE u.id = %s
+    """
 
     data = (body['nome_completo'], id)
     
@@ -323,7 +352,7 @@ def change_fullname_user(id):
 
     if item == None:
         return success_handle(json.dumps({
-            'message': 'Nome completo do usuário atualizado com sucesso'
+            'message': 'Nome completo do usuário atualizado com sucesso.'
         }))
 
 # Route to update one user email
@@ -331,7 +360,11 @@ def change_fullname_user(id):
 def change_email_user(id):
     body = request.get_json(force=True)
 
-    query = "UPDATE missing_finder.usuario set email = %s where id = %s"
+    query = """
+        UPDATE missing_finder.usuario u
+        SET u.email = %s
+        WHERE u.id = %s
+    """
 
     data = (body['email'], id)
 
@@ -340,7 +373,7 @@ def change_email_user(id):
 
     if item == None:
         return success_handle(json.dumps({
-            'message': 'Email do usuário atualizado com sucesso'
+            'message': 'Email do usuário atualizado com sucesso.'
         }))
 
 # Route to update one user phone
@@ -348,7 +381,9 @@ def change_email_user(id):
 def change_phone_user(id):
     body = request.get_json(force=True)
 
-    query = "UPDATE missing_finder.usuario set telefone = %s where id = %s"
+    query = """UPDATE missing_finder.usuario u
+    SET u.telefone = %s
+    WHERE u.id = %s"""
 
     data = (body['telefone'], id)
 
@@ -357,7 +392,7 @@ def change_phone_user(id):
 
     if item == None:
         return success_handle(json.dumps({
-            'message': 'Telefone do usuário atualizado com sucesso'
+            'message': 'Telefone do usuário atualizado com sucesso.'
         }))
 
 # Route to update one user password
@@ -368,7 +403,11 @@ def change_password_user(id):
     pass_hash = hashlib.sha256(body['senha'].encode())
     body['senha'] = pass_hash.hexdigest()
 
-    query = "UPDATE missing_finder.usuario set senha = %s where id = %s"
+    query = """
+        UPDATE missing_finder.usuario u
+        SET u.senha = %s
+        WHERE u.id = %s
+    """
 
     data = (body['senha'], id)
 
@@ -377,7 +416,7 @@ def change_password_user(id):
 
     if item == None:
         return success_handle(json.dumps({
-            'message': 'Senha do usuário atualizado com sucesso'
+            'message': 'Senha do usuário atualizada com sucesso.'
         }))
 
 # Route to authenticate a user
@@ -399,9 +438,9 @@ def login():
             password = pass_hash.hexdigest()
 
             query = """
-                select u.id, u.senha
+                SELECT u.id, u.senha
                 FROM missing_finder.usuario u
-                WHERE nome_usuario = %s;
+                WHERE u.nome_usuario = %s;
             """
             cur.execute(query, (username,))
             result = cur.fetchall()
