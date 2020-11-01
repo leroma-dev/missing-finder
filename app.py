@@ -340,9 +340,8 @@ def change_password_user(id):
 @app.route('/api/auth', methods=['GET'])
 @login_manager.request_loader
 def login():
-    print(request)
     api_key = request.headers.get('Authorization')
-    print(api_key)
+    
     if api_key:
         api_key = api_key.replace('Basic ', '', 1)
         try:
@@ -351,25 +350,21 @@ def login():
             header_split = api_key.split(b':')
             username = header_split[0].decode("utf-8")
             password = header_split[1].decode("utf-8")
-            print(password)
 
             pass_hash = hashlib.sha256(password.encode())
             password = pass_hash.hexdigest()
-            print(username)
-            print(password)
 
             query = """
-                select u.senha
+                select u.id, u.senha
                 FROM missing_finder.usuario u
                 WHERE nome_usuario = %s;
             """
             cur.execute(query, (username,))
             result = cur.fetchall()
-            print(result)
-            print(result[0][0])
 
-            if password == result[0][0]:
+            if password == result[0][1]:
                 return success_handle(json.dumps({
+                    'id': result[0][0],
                     'message': 'Usuário logado com sucesso'
                 }))
             else:
@@ -378,9 +373,6 @@ def login():
             pass
     
     return None
-
-
-    # return jsonify(buildUser(result))
 
 # route to update user info
 @app.route('/api/users/<int:id>', methods=['PUT'])
