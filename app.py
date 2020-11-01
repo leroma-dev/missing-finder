@@ -166,6 +166,7 @@ def insert_missed_person(body, faceBundle):
     return id
 
 # Route to update one missed person activation status
+@app.route('/api/people/missed/<id>/deactivate', methods=['PATCH'])
 def deactivate_missed_person(id):
     body = request.get_json(force=True)
 
@@ -219,6 +220,7 @@ def add_tip_of_found_person(id):
         }))
 
 # Route to update one found person activation status
+@app.route('/api/people/found/<id>/deactivate', methods=['PATCH'])
 def deactivate_found_person(id):
     body = request.get_json(force=True)
 
