@@ -1,0 +1,44 @@
+version: '3.1'
+services:
+  missingfinder-postgres:
+    image: 'postgres:alpine'
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: 'mysecretpassword'
+      POSTGRES_USER: 'postgres'
+      POSTGRES_DB: 'postgres'
+    volumes:
+      - /home/programador/desenv/dockerProjects/Docker-Compose/PostgreSQL:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+    networks:
+      - postgres-compose-network
+      
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - '8080:8080'
+    depends_on:
+      - missingfinder-postgres
+    networks:
+      - postgres-compose-network
+      
+      
+  missingfinder-pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: 'umemail@qualquer.com'
+      PGADMIN_DEFAULT_PASSWORD: 'PgAdmin2020'
+    ports:
+      - '16543:80'
+    depends_on:
+      - missingfinder-postgres
+    networks:
+      - postgres-compose-network
+      
+
+networks: 
+  postgres-compose-network:
+    driver: bridge
+    
