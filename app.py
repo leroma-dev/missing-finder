@@ -175,9 +175,9 @@ def deactivate_missed_person(id):
     body = request.get_json(force=True)
 
     query = """
-        UPDATE missing_finder.pessoa_desaparecida pd
-        SET pd.ativo = %s
-        WHERE pd.id = %s
+        UPDATE missing_finder.pessoa_desaparecida
+        SET ativo = %s
+        WHERE id = %s
     """
 
     data = (body['ativo'], id)
@@ -218,9 +218,9 @@ def add_tip_of_found_person(id):
     body = request.get_json(force=True)
 
     query = """
-        UPDATE missing_finder.pessoa_achada pa
-        SET pa.tip = pa.tip || %s::json
-        WHERE pa.id = %s
+        UPDATE missing_finder.pessoa_achada
+        SET tip = tip || %s::json
+        WHERE id = %s
     """
 
     data = (json.dumps(body['tip']), id)
@@ -239,9 +239,9 @@ def deactivate_found_person(id):
     body = request.get_json(force=True)
 
     query = """
-        UPDATE missing_finder.pessoa_achada pa
-        SET pa.ativo = %s
-        WHERE pa.id = %s
+        UPDATE missing_finder.pessoa_achada
+        SET ativo = %s
+        WHERE id = %s
     """
 
     data = (body['ativo'], id)
@@ -340,9 +340,9 @@ def change_fullname_user(id):
     body = request.get_json(force=True)
 
     query = """
-        UPDATE missing_finder.usuario u
-        SET u.nome_completo = %s
-        WHERE u.id = %s
+        UPDATE missing_finder.usuario
+        SET nome_completo = %s
+        WHERE id = %s
     """
 
     data = (body['nome_completo'], id)
@@ -361,9 +361,9 @@ def change_email_user(id):
     body = request.get_json(force=True)
 
     query = """
-        UPDATE missing_finder.usuario u
-        SET u.email = %s
-        WHERE u.id = %s
+        UPDATE missing_finder.usuario
+        SET email = %s
+        WHERE id = %s
     """
 
     data = (body['email'], id)
@@ -381,9 +381,9 @@ def change_email_user(id):
 def change_phone_user(id):
     body = request.get_json(force=True)
 
-    query = """UPDATE missing_finder.usuario u
-    SET u.telefone = %s
-    WHERE u.id = %s"""
+    query = """UPDATE missing_finder.usuario
+    SET telefone = %s
+    WHERE id = %s"""
 
     data = (body['telefone'], id)
 
@@ -404,9 +404,9 @@ def change_password_user(id):
     body['senha'] = pass_hash.hexdigest()
 
     query = """
-        UPDATE missing_finder.usuario u
-        SET u.senha = %s
-        WHERE u.id = %s
+        UPDATE missing_finder.usuario
+        SET senha = %s
+        WHERE id = %s
     """
 
     data = (body['senha'], id)
@@ -463,9 +463,9 @@ def user_update(id):
     body = request.get_json(force=True)
 
     query = """
-        UPDATE missing_finder.usuario u
-        SET u.email = %s, u.senha = %s, u.telefone = %s, u.nome_completo = %s
-        WHERE u.id = %s
+        UPDATE missing_finder.usuario
+        SET email = %s, senha = %s, telefone = %s, nome_completo = %s
+        WHERE id = %s
     """
 
     data = (body['email'], hashlib.sha256(body['senha'].encode()).hexdigest(), body['telefone'], body['nome_completo'], id)
