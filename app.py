@@ -448,7 +448,7 @@ def login():
             if password == result[0][1]:
                 return success_handle(json.dumps({
                     'id': result[0][0],
-                    'message': 'Usuário logado com sucesso'
+                    'message': 'Usuário logado com sucesso.'
                 }))
             else:
                 return error_handle("Senha incorreta.")
@@ -475,7 +475,7 @@ def user_update(id):
 
     if item == None:
         return success_handle(json.dumps({
-            'message': 'Usuário atualizado com sucesso'
+            'message': 'Usuário atualizado com sucesso.'
         }))
 
 
