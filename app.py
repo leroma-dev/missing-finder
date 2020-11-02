@@ -177,7 +177,7 @@ def deactivate_missed_person(id):
     query = """
         UPDATE missing_finder.pessoa_desaparecida pd
         SET pd.ativo = %s
-        WHERE pd.id = %s]
+        WHERE pd.id = %s
     """
 
     data = (body['ativo'], id)
