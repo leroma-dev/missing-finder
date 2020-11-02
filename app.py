@@ -13,6 +13,8 @@ import asyncio
 from flask_login import login_user, login_manager
 from dateutil.relativedelta import relativedelta
 import base64
+import hashlib
+from dateutil.relativedelta import relativedelta
 
 app = Flask(__name__)
 app.config.from_object('config.Config')
@@ -260,15 +262,13 @@ def insert_found_person(body, faceBundle):
 def user_create():
     body = request.get_json(force=True)
 
-    body['senha'] = generate_password_hash(body['senha'], method='sha256')
+    pass_hash = hashlib.sha256(body['senha'].encode())
+    body['senha'] = pass_hash.hexdigest()
 
     query = "INSERT INTO missing_finder.usuario (nome_usuario, email, senha, telefone, nome_completo) VALUES (%s, %s, %s, %s, %s)"
 
     data = (body['nome_usuario'], body['email'], body['senha'], body['telefone'], body['nome_completo'])
-
-    # still under testing
-    # data.senha = generate_password_hash(data.senha, method='sha256')
-
+    print(data)
     item = cur.execute(query, data)
     conn.commit()
 
@@ -346,7 +346,8 @@ def change_phone_user(id):
 def change_password_user(id):
     body = request.get_json(force=True)
 
-    body['senha'] = generate_password_hash(body['senha'], method='sha256')
+    pass_hash = hashlib.sha256(body['senha'].encode())
+    body['senha'] = pass_hash.hexdigest()
 
     query = "UPDATE missing_finder.usuario set senha = %s where id = %s"
 
@@ -363,30 +364,40 @@ def change_password_user(id):
 # route to authentication login
 @app.route('/api/auth', methods=['GET'])
 @login_manager.request_loader
-def login(request):
-    api_key = request.args.get('Authorization')
+def login():
+    api_key = request.headers.get('Authorization')
+    
     if api_key:
         api_key = api_key.replace('Basic ', '', 1)
         try:
             api_key = base64.b64decode(api_key)
+
+            header_split = api_key.split(b':')
+            username = header_split[0].decode("utf-8")
+            password = header_split[1].decode("utf-8")
+
+            pass_hash = hashlib.sha256(password.encode())
+            password = pass_hash.hexdigest()
+
+            query = """
+                select u.id, u.senha
+                FROM missing_finder.usuario u
+                WHERE nome_usuario = %s;
+            """
+            cur.execute(query, (username,))
+            result = cur.fetchall()
+
+            if password == result[0][1]:
+                return success_handle(json.dumps({
+                    'id': result[0][0],
+                    'message': 'Usuário logado com sucesso'
+                }))
+            else:
+                return error_handle("Senha incorreta.")
         except TypeError:
             pass
-        # user = User.query.filter_by(api_key=api_key).first()
-        # if user:
-        #     return user
-        print(api_key)
     
     return None
-
-    # query = """
-    #     select u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo
-    #     FROM missing_finder.usuario u
-    #     WHERE nome_usuario = '%s';
-    # """
-    # cur.execute(query, (nome_usuario,))
-    # result = cur.fetchall()
-
-    # return jsonify(buildUser(result))
 
 # route to update user info
 @app.route('/api/users/<int:id>', methods=['PUT'])
