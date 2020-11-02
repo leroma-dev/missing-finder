@@ -156,9 +156,9 @@ def create_one_missed_person():
 
 def insert_missed_person(body, faceBundle):
     query = """
-        INSERT INTO missing_finder.pessoa_desaparecida pd (pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.usuario_id, pd.endereco, pd.ativo, pd.encoding)
+        INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, idade, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco, ativo, encoding)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, true, %s::json)
-        RETURNING pd.id
+        RETURNING id
     """
 
     data = (body['nome'], body['nascimento'], relativedelta(datetime.today(), datetime.strptime(body['nascimento'], '%Y-%m-%d')).years, body['data_desaparecimento'], body['parentesco'], body['mensagem_de_aviso'], body['mensagem_para_desaparecido'], body['usuario_id'], json.dumps(body['endereco']), json.dumps(faceBundle.getEncodings().tolist()))
@@ -278,9 +278,9 @@ def create_one_found_person():
 
 def insert_found_person(body, faceBundle):
     query = """
-        INSERT INTO missing_finder.pessoa_achada pa (pa.nome, pa.idade, pa.tip, pa.ativo, pa.encoding)
+        INSERT INTO missing_finder.pessoa_achada (nome, idade, tip, ativo, encoding)
         VALUES (%s, %s, array[%s::json], true, %s::json)
-        RETURNING pa.id
+        RETURNING id
     """
 
     data = (body['nome'], body['idade'], json.dumps(body['tip']), json.dumps(faceBundle.getEncodings().tolist()))
@@ -304,7 +304,7 @@ def user_create():
     body['senha'] = pass_hash.hexdigest()
 
     query = """
-        INSERT INTO missing_finder.usuario u (u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo)
+        INSERT INTO missing_finder.usuario (nome_usuario, email, senha, telefone, nome_completo)
         VALUES (%s, %s, %s, %s, %s)
     """
 
