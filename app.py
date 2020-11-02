@@ -54,7 +54,9 @@ def buildInformationFoundPerson(values):
             "ativo": value[3],
             "tip": value[4],
             "encoding": value[5],
-            "tipo": 'ACHADA'
+            "tipo": 'ACHADA',
+            "data_criacao": value[6],
+            "data_desativacao": value[7]
         }
         result.append(buildData)
     return result
@@ -76,12 +78,14 @@ def buildInformationMissedPerson(values):
             "endereco": value[9],
             "encoding": value[10],
             "tipo": 'DESAPARECIDA',
+            "data_criacao": value[11],
+            "data_desativacao": value[12],
             "user": {
-                "id": value[11],
-                "email": value[12],
-                "telefone": value[13],
-                "nome": value[14],
-            },
+                "id": value[13],
+                "email": value[14],
+                "telefone": value[15],
+                "nome": value[16]
+            } 
         }
         result.append(buildData)
     return result
@@ -110,12 +114,34 @@ def homepage():
 # Route to get all missed people
 @app.route('/api/people/missed', methods=['GET'])
 def get_all_missed_person():
+    active = request.args.get('active')
+    user_id = request.args.get('userId')
+
     query = """
-        SELECT pd.id, pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encoding, u.id, u.email, u.telefone, u.nome_completo
+        SELECT pd.id, pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encoding, pd.data_criacao, pd.data_desativacao, u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_desaparecida pd 
         INNER JOIN missing_finder.usuario u ON pd.usuario_id = u.id
+        WHERE 1 = 1
     """
-    cur.execute(query)
+
+    data = ()
+
+    if active:
+        query = query + " AND pd.ativo = %s"
+        data = (data + (active,))
+
+    if user_id:
+        query = query + " AND u.id = %s"
+        data = (data + (user_id,))
+
+    print(query)
+    print(data)
+
+    if data:
+        cur.execute(query, data)
+    else:
+        cur.execute(query)
+
     result = cur.fetchall()
     return jsonify(buildInformationMissedPerson(result))
 
@@ -123,7 +149,7 @@ def get_all_missed_person():
 @app.route('/api/people/missed/<id>', methods=['GET'])
 def get_one_missed_person(id):
     query = """
-        SELECT pd.id, pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encoding, u.id, u.email, u.telefone, u.nome_completo
+        SELECT pd.id, pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encoding, pd.data_criacao, pd.data_desativacao, u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_desaparecida pd 
         INNER JOIN missing_finder.usuario u ON pd.usuario_id = u.id
         WHERE pd.id = %s
@@ -156,12 +182,12 @@ def create_one_missed_person():
 
 def insert_missed_person(body, faceBundle):
     query = """
-        INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, idade, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco, ativo, encoding)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, true, %s::json)
+        INSERT INTO missing_finder.pessoa_desaparecida (nome, nascimento, idade, data_desaparecimento, parentesco, mensagem_de_aviso, mensagem_para_desaparecido, usuario_id, endereco, ativo, encoding, data_criacao)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, True, %s::json, %s)
         RETURNING id
     """
 
-    data = (body['nome'], body['nascimento'], relativedelta(datetime.today(), datetime.strptime(body['nascimento'], '%Y-%m-%d')).years, body['data_desaparecimento'], body['parentesco'], body['mensagem_de_aviso'], body['mensagem_para_desaparecido'], body['usuario_id'], json.dumps(body['endereco']), json.dumps(faceBundle.getEncodings().tolist()))
+    data = (body['nome'], body['nascimento'], relativedelta(datetime.today(), datetime.strptime(body['nascimento'], '%Y-%m-%d')).years, body['data_desaparecimento'], body['parentesco'], body['mensagem_de_aviso'], body['mensagem_para_desaparecido'], body['usuario_id'], json.dumps(body['endereco']), json.dumps(faceBundle.getEncodings().tolist()), datetime.now())
 
     cur.execute(query, data)
     id = cur.fetchone()[0]
@@ -176,11 +202,11 @@ def deactivate_missed_person(id):
 
     query = """
         UPDATE missing_finder.pessoa_desaparecida
-        SET ativo = %s
+        SET ativo = %s, data_desativacao = %s
         WHERE id = %s
     """
 
-    data = (body['ativo'], id)
+    data = (body['ativo'], datetime.now(), id)
 
     item = cur.execute(query, data)
     conn.commit()
@@ -193,10 +219,33 @@ def deactivate_missed_person(id):
 # Route to get all found people
 @app.route('/api/people/found', methods=['GET'])
 def get_all_found_person():
+    active = request.args.get('active')
+    user_id = request.args.get('userId')
+
     query = """
-        SELECT pa.id, pa.nome, pa.idade, pa.ativo, pa.tip, pa.encoding FROM missing_finder.pessoa_achada pa
+        SELECT pa.id, pa.nome, pa.idade, pa.ativo, pa.tip, pa.encoding, pa.data_criacao, pa.data_desativacao
+        FROM missing_finder.pessoa_achada pa
+        WHERE 1 = 1
     """
-    cur.execute(query)
+    
+    data = ()
+
+    if active:
+        query = query + " AND pa.ativo = %s"
+        data = (data + (active,))
+
+    if user_id:
+        query = query + " AND u.id = %s"
+        data = (data + (user_id,))
+
+    print(query)
+    print(data)
+
+    if data:
+        cur.execute(query, data)
+    else:
+        cur.execute(query)
+    
     result = cur.fetchall()
     return jsonify(buildInformationFoundPerson(result))
 
@@ -204,7 +253,7 @@ def get_all_found_person():
 @app.route('/api/people/found/<id>', methods=['GET'])
 def get_one_found_person(id):
     query = """
-        SELECT pa.id, pa.nome, pa.idade, pa.ativo, pa.tip, pa.encoding
+        SELECT pa.id, pa.nome, pa.idade, pa.ativo, pa.tip, pa.encoding, pa.data_criacao, pa.data_desativacao
         FROM missing_finder.pessoa_achada pa
         WHERE id = %s
     """
@@ -240,11 +289,11 @@ def deactivate_found_person(id):
 
     query = """
         UPDATE missing_finder.pessoa_achada
-        SET ativo = %s
+        SET ativo = %s, data_desativacao = %s
         WHERE id = %s
     """
 
-    data = (body['ativo'], id)
+    data = (body['ativo'], datetime.now(), id)
 
     item = cur.execute(query, data)
     conn.commit()
@@ -278,12 +327,12 @@ def create_one_found_person():
 
 def insert_found_person(body, faceBundle):
     query = """
-        INSERT INTO missing_finder.pessoa_achada (nome, idade, tip, ativo, encoding)
-        VALUES (%s, %s, array[%s::json], true, %s::json)
+        INSERT INTO missing_finder.pessoa_achada (nome, idade, tip, ativo, encoding, data_criacao)
+        VALUES (%s, %s, array[%s::json], True, %s::json, %s)
         RETURNING id
     """
 
-    data = (body['nome'], body['idade'], json.dumps(body['tip']), json.dumps(faceBundle.getEncodings().tolist()))
+    data = (body['nome'], body['idade'], json.dumps(body['tip']), json.dumps(faceBundle.getEncodings().tolist()), datetime.now())
 
     cur.execute(query, data)
     id = cur.fetchone()[0]
@@ -304,11 +353,11 @@ def user_create():
     body['senha'] = pass_hash.hexdigest()
 
     query = """
-        INSERT INTO missing_finder.usuario (nome_usuario, email, senha, telefone, nome_completo)
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO missing_finder.usuario (nome_usuario, email, senha, telefone, nome_completo, data_criacao)
+        VALUES (%s, %s, %s, %s, %s, %s)
     """
 
-    data = (body['nome_usuario'], body['email'], body['senha'], body['telefone'], body['nome_completo'])
+    data = (body['nome_usuario'], body['email'], body['senha'], body['telefone'], body['nome_completo'], datetime.now())
     print(data)
     item = cur.execute(query, data)
     conn.commit()
@@ -322,7 +371,7 @@ def user_create():
 @app.route('/api/users/<id>', methods=['GET'])
 def one_user_id(id):
     query = """
-        SELECT u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo
+        SELECT u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo, u.data_criacao, u.data_atualizacao
         FROM missing_finder.usuario u
         WHERE u.id = %s;
     """
@@ -341,11 +390,11 @@ def change_fullname_user(id):
 
     query = """
         UPDATE missing_finder.usuario
-        SET nome_completo = %s
+        SET nome_completo = %s, data_atualizacao = %s
         WHERE id = %s
     """
 
-    data = (body['nome_completo'], id)
+    data = (body['nome_completo'], datetime.now(), id)
     
     item = cur.execute(query, data)
     conn.commit()
@@ -362,11 +411,11 @@ def change_email_user(id):
 
     query = """
         UPDATE missing_finder.usuario
-        SET email = %s
+        SET email = %s, data_atualizacao = %s
         WHERE id = %s
     """
 
-    data = (body['email'], id)
+    data = (body['email'], datetime.now(), id)
 
     item = cur.execute(query, data)
     conn.commit()
@@ -382,10 +431,10 @@ def change_phone_user(id):
     body = request.get_json(force=True)
 
     query = """UPDATE missing_finder.usuario
-    SET telefone = %s
+    SET telefone = %s, data_atualizacao = %s
     WHERE id = %s"""
 
-    data = (body['telefone'], id)
+    data = (body['telefone'], datetime.now(), id)
 
     item = cur.execute(query, data)
     conn.commit()
@@ -405,11 +454,11 @@ def change_password_user(id):
 
     query = """
         UPDATE missing_finder.usuario
-        SET senha = %s
+        SET senha = %s, data_atualizacao = %s
         WHERE id = %s
     """
 
-    data = (body['senha'], id)
+    data = (body['senha'], datetime.now(), id)
 
     item = cur.execute(query, data)
     conn.commit()
@@ -464,11 +513,11 @@ def user_update(id):
 
     query = """
         UPDATE missing_finder.usuario
-        SET email = %s, senha = %s, telefone = %s, nome_completo = %s
+        SET email = %s, senha = %s, telefone = %s, nome_completo = %s, data_atualizacao = %s
         WHERE id = %s
     """
 
-    data = (body['email'], hashlib.sha256(body['senha'].encode()).hexdigest(), body['telefone'], body['nome_completo'], id)
+    data = (body['email'], hashlib.sha256(body['senha'].encode()).hexdigest(), body['telefone'], body['nome_completo'], datetime.now(), id)
 
     item = cur.execute(query, data)
     conn.commit()
@@ -489,7 +538,9 @@ def buildUser(values):
             "email": value[2],
             "senha": value[3],
             "telefone": value[4],
-            "nome_completo": value[5]
+            "nome_completo": value[5],
+            "data_criacao": value[6],
+            "data_atualizacao": value[7]
         }
         result.append(buildData)
     return result

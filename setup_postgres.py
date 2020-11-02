@@ -15,7 +15,9 @@ def create_tables():
             email VARCHAR NULL,
             senha VARCHAR NULL,
             telefone VARCHAR NULL,
-            nome_completo VARCHAR NULL
+            nome_completo VARCHAR NULL,
+            data_criacao TIMESTAMP,
+            data_atualizacao TIMESTAMP
         );
         """,
         """
@@ -31,7 +33,9 @@ def create_tables():
             mensagem_para_desaparecido VARCHAR NULL,
             ativo BOOLEAN NULL,
             endereco JSON NULL,
-            encoding JSON NULL
+            encoding JSON NULL,
+            data_criacao TIMESTAMP,
+            data_desativacao TIMESTAMP NULL
         );
         """,
         """
@@ -41,7 +45,9 @@ def create_tables():
             idade INTEGER NULL,
             ativo BOOLEAN NULL,
             tip JSON[] NULL,
-            encoding JSON NULL
+            encoding JSON NULL,
+            data_criacao TIMESTAMP,
+            data_desativacao TIMESTAMP NULL
         );
         """,
         )
