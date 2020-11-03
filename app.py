@@ -69,7 +69,7 @@ def buildInformationFoundPerson(values):
                     "email": value[15],
                     "telefone": value[16],
                     "nome": value[17]
-        }
+                } 
             }  
         }
         result.append(buildData)
@@ -104,6 +104,22 @@ def buildInformationMissedPerson(values):
         result.append(buildData)
     return result
 
+def buildPersonInformation(values):
+    result = []
+    for value in values:
+        buildData = {
+            "id": value[0],
+            "nome": value[1],
+            "idade": value[2],
+            "url_imagem": 'https://missing-finder-bucket.s3-sa-east-1.amazonaws.com/{}/{}/reference.jpg'.format('missed' if value[4] == 'DESAPARECIDA' else 'found', value[0]),
+            "ativo": value[3],
+            "tipo": value[4],
+            "data_criacao": value[5],
+            "data_desativacao": value[6]
+        }
+        result.append(buildData)
+    return result
+
 def success_handle(output, status=200, mimetype='application/json'):
     return Response(output, status=status, mimetype=mimetype)
 
@@ -124,6 +140,25 @@ def homepage():
 #
 #    <----    PEOPLE ENDPOINTS   ---->
 #
+
+# Route to get all people
+@app.route('/api/people', methods=['GET'])
+def get_all_people():
+    active = request.args.get('active')
+    user_id = request.args.get('userId')
+
+    query = """
+        SELECT pd.id, pd.nome, pd.idade, pd.ativo, 'DESAPARECIDA', pd.data_criacao, pd.data_desativacao
+        FROM missing_finder.pessoa_desaparecida pd
+        UNION
+        SELECT pa.id, pa.nome, pa.idade, pa.ativo, 'ACHADA', pa.data_criacao, pa.data_desativacao
+        FROM missing_finder.pessoa_achada pa
+    """
+    
+    cur.execute(query)
+
+    result = cur.fetchall()
+    return jsonify(buildPersonInformation(result))
 
 # Route to get all missed people
 @app.route('/api/people/missed', methods=['GET'])
@@ -147,9 +182,6 @@ def get_all_missed_person():
     if user_id:
         query = query + " AND u.id = %s"
         data = (data + (user_id,))
-
-    print(query)
-    print(data)
 
     if data:
         cur.execute(query, data)
@@ -256,9 +288,6 @@ def get_all_found_person():
         query = query + " AND u.id = %s"
         data = (data + (user_id,))
 
-    print(query)
-    print(data)
-
     if data:
         cur.execute(query, data)
     else:
@@ -329,8 +358,8 @@ def create_one_found_person():
 
     if id:
         tipId = insert_tip(body['dica'], id)
-    target_file_path = '{}/{}/reference.jpg'.format('found', id)
-    s3_util.move_file(source_file_path, target_file_path)
+        target_file_path = '{}/{}/reference.jpg'.format('found', id)
+        s3_util.move_file(source_file_path, target_file_path)
 
         return success_handle(json.dumps({
             'id': id,
