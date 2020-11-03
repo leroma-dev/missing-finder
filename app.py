@@ -7,7 +7,7 @@ from os import path, getcwd
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
-import json
+import simplejson as json
 from datetime import datetime
 import asyncio
 from flask_login import login_user, LoginManager
@@ -52,11 +52,25 @@ def buildInformationFoundPerson(values):
             "idade": value[2],
             "url_imagem": 'https://missing-finder-bucket.s3-sa-east-1.amazonaws.com/{}/{}/reference.jpg'.format('found', value[0]),
             "ativo": value[3],
-            "tip": value[4],
-            "encoding": value[5],
+            "encoding": value[4],
+            "data_criacao": value[5],
+            "data_desativacao": value[6],
             "tipo": 'ACHADA',
-            "data_criacao": value[6],
-            "data_desativacao": value[7]
+            "dica": {
+                "id": value[7],
+                "mensagem_de_aviso": value[8],
+                "lat": json.dumps(json.Decimal(value[9])),
+                "long": json.dumps(json.Decimal(value[10])),
+                "endereco": value[11],
+                "data_criacao": value[12],
+                "data_atualizacao": value[13],
+                "user": {
+                    "id": value[14],
+                    "email": value[15],
+                    "telefone": value[16],
+                    "nome": value[17]
+        }
+            }  
         }
         result.append(buildData)
     return result
@@ -223,8 +237,12 @@ def get_all_found_person():
     user_id = request.args.get('userId')
 
     query = """
-        SELECT pa.id, pa.nome, pa.idade, pa.ativo, pa.tip, pa.encoding, pa.data_criacao, pa.data_desativacao
+        SELECT pa.id, pa.nome, pa.idade, pa.ativo, pa.encoding, pa.data_criacao, pa.data_desativacao, 
+        d.id, d.mensagem_de_aviso, d.latitude, d.longitude, d.endereco, d.data_criacao, d.data_atualizacao,
+        u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_achada pa
+        INNER JOIN missing_finder.dica d ON pa.id = d.pessoa_achada_id
+        INNER JOIN missing_finder.usuario u ON d.usuario_id = u.id
         WHERE 1 = 1
     """
     
@@ -253,9 +271,13 @@ def get_all_found_person():
 @app.route('/api/people/found/<id>', methods=['GET'])
 def get_one_found_person(id):
     query = """
-        SELECT pa.id, pa.nome, pa.idade, pa.ativo, pa.tip, pa.encoding, pa.data_criacao, pa.data_desativacao
+        SELECT pa.id, pa.nome, pa.idade, pa.ativo, pa.encoding, pa.data_criacao, pa.data_desativacao,
+        d.id, d.mensagem_de_aviso, d.latitude, d.longitude, d.endereco, d.data_criacao, d.data_atualizacao,
+        u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_achada pa
-        WHERE id = %s
+        INNER JOIN missing_finder.dica d ON pa.id = d.pessoa_achada_id
+        INNER JOIN missing_finder.usuario u ON d.usuario_id = u.id
+        WHERE pa.id = %s
     """
     cur.execute(query, (id))
     result = cur.fetchall()
@@ -266,18 +288,9 @@ def get_one_found_person(id):
 def add_tip_of_found_person(id):
     body = request.get_json(force=True)
 
-    query = """
-        UPDATE missing_finder.pessoa_achada
-        SET tip = tip || %s::json
-        WHERE id = %s
-    """
+    tipId = insert_tip(body, body['pessoa_achada_id'])
 
-    data = (json.dumps(body['tip']), id)
-
-    item = cur.execute(query, data)
-    conn.commit()
- 
-    if item == None:
+    if tipId:
         return success_handle(json.dumps({
             'message': 'Pessoa achada atualizada com sucesso.'
         }))
@@ -314,10 +327,11 @@ def create_one_found_person():
 
     id = insert_found_person(body, faceBundle)
 
+    if id:
+        tipId = insert_tip(body['dica'], id)
     target_file_path = '{}/{}/reference.jpg'.format('found', id)
     s3_util.move_file(source_file_path, target_file_path)
 
-    if id:
         return success_handle(json.dumps({
             'id': id,
             'message': 'Pessoa achada cadastrada com sucesso.'
@@ -325,14 +339,29 @@ def create_one_found_person():
     else:
         return error_handle("Não foi possível cadastrar a pessoa achada.")
 
-def insert_found_person(body, faceBundle):
+def insert_tip(tipBody, id):
     query = """
-        INSERT INTO missing_finder.pessoa_achada (nome, idade, tip, ativo, encoding, data_criacao)
-        VALUES (%s, %s, array[%s::json], True, %s::json, %s)
+        INSERT INTO missing_finder.dica (pessoa_achada_id, mensagem_de_aviso, latitude, longitude, usuario_id, endereco, data_criacao, data_atualizacao)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
     """
 
-    data = (body['nome'], body['idade'], json.dumps(body['tip']), json.dumps(faceBundle.getEncodings().tolist()), datetime.now())
+    data = (id, tipBody['mensagem_de_aviso'], tipBody['lat'], tipBody['long'], tipBody['usuario_id'], json.dumps(tipBody['endereco']), datetime.now(), datetime.now())
+
+    cur.execute(query, data)
+    tip_id = cur.fetchone()[0]
+    conn.commit()
+
+    return tip_id
+
+def insert_found_person(body, faceBundle):
+    query = """
+        INSERT INTO missing_finder.pessoa_achada (nome, idade, ativo, encoding, data_criacao)
+        VALUES (%s, %s, True, %s::json, %s)
+        RETURNING id
+    """
+
+    data = (body['nome'], body['idade'], json.dumps(faceBundle.getEncodings().tolist()), datetime.now())
 
     cur.execute(query, data)
     id = cur.fetchone()[0]

@@ -44,10 +44,22 @@ def create_tables():
             nome VARCHAR NULL,
             idade INTEGER NULL,
             ativo BOOLEAN NULL,
-            tip JSON[] NULL,
             encoding JSON NULL,
             data_criacao TIMESTAMP,
             data_desativacao TIMESTAMP NULL
+        );
+        """,
+        """
+        CREATE TABLE missing_finder.dica (
+            id serial PRIMARY KEY,
+            usuario_id INTEGER NOT NULL REFERENCES missing_finder.usuario(id),
+            pessoa_achada_id INTEGER NOT NULL REFERENCES missing_finder.pessoa_achada(id),
+            mensagem_de_aviso VARCHAR NULL,
+            latitude NUMERIC(8,6) NULL,
+            longitude NUMERIC(9,6) NULL,
+            endereco JSON NULL,
+            data_criacao TIMESTAMP,
+            data_atualizacao TIMESTAMP
         );
         """,
         )
