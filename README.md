@@ -122,3 +122,32 @@ python setup_postgres.py
 # Referencias
 (PostgreSQL + pgAdmin 4 + Docker Compose: montando rapidamente um ambiente para uso)
 https://medium.com/@renato.groffe/postgresql-pgadmin-4-docker-compose-montando-rapidamente-um-ambiente-para-uso-55a2ab230b89
+
+
+
+# Amazon AWS
+Instalação do AWS cli
+https://aws.amazon.com/pt/cli/
+
+Caso não esteja criado, criar o diretorio ~/.aws no home.
+
+Sobre a utilização do BOTO3 com o AWS
+https://boto3.amazonaws.com/v1/documentation/api/latest/guide/quickstart.html#configuration
+
+```
+https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-linux.html#cliv2-linux-install
+
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+```
+
+# Flutter
+Instalar o flutter e android studio
+
+## Instalar o Flutter: 
+```
+sudo snap install flutter --classic
+```
+
+

@@ -10,7 +10,8 @@ import psycopg2
 import json
 from datetime import datetime
 import asyncio
-from flask_login import login_user, LoginManager
+from flask_login import login_user, login_manager
+from dateutil.relativedelta import relativedelta
 import base64
 import hashlib
 from dateutil.relativedelta import relativedelta
