@@ -120,10 +120,10 @@ def buildPersonInformation(values):
         result.append(buildData)
     return result
 
-def success_handle(output, status=200, mimetype='application/json'):
+def success_handle(output=None, status=200, mimetype='application/json'):
     return Response(output, status=status, mimetype=mimetype)
 
-def error_handle(error_message, status=500, mimetype='application/json'):
+def error_handle(error_message=None, status=500, mimetype='application/json'):
     return Response(json.dumps({"error": error_message}), status=status, mimetype=mimetype)
 
 # Route for homepage
@@ -194,6 +194,10 @@ def get_all_missed_person():
 # Route to get one missed person
 @app.route('/api/people/missed/<id>', methods=['GET'])
 def get_one_missed_person(id):
+    result = find_missed_person_by_id(id)
+    return jsonify(buildInformationMissedPerson(result)[0])
+
+def find_missed_person_by_id(id):
     query = """
         SELECT pd.id, pd.nome, pd.nascimento, pd.idade, pd.data_desaparecimento, pd.parentesco, pd.mensagem_de_aviso, pd.mensagem_para_desaparecido, pd.ativo, pd.endereco, pd.encoding, pd.data_criacao, pd.data_desativacao, u.id, u.email, u.telefone, u.nome_completo
         FROM missing_finder.pessoa_desaparecida pd 
@@ -201,8 +205,7 @@ def get_one_missed_person(id):
         WHERE pd.id = %s
     """
     cur.execute(query, (id))
-    result = cur.fetchall()
-    return jsonify(buildInformationMissedPerson(result)[0])
+    return cur.fetchall()
 
 # Route to create one missed person
 @app.route('/api/people/missed', methods=['POST'])
@@ -299,6 +302,10 @@ def get_all_found_person():
 # Route to get one found person
 @app.route('/api/people/found/<id>', methods=['GET'])
 def get_one_found_person(id):
+    result = find_found_person_by_id(id)
+    return jsonify(buildInformationFoundPerson(result)[0])
+
+def find_found_person_by_id(id):
     query = """
         SELECT pa.id, pa.nome, pa.idade, pa.ativo, pa.encoding, pa.data_criacao, pa.data_desativacao,
         d.id, d.mensagem_de_aviso, d.latitude, d.longitude, d.endereco, d.data_criacao, d.data_atualizacao,
@@ -309,8 +316,7 @@ def get_one_found_person(id):
         WHERE pa.id = %s
     """
     cur.execute(query, (id))
-    result = cur.fetchall()
-    return jsonify(buildInformationFoundPerson(result)[0])
+    return cur.fetchall()
 
 # Route to update one found person with a tip
 @app.route('/api/people/found/<id>', methods=['PATCH'])
@@ -404,7 +410,7 @@ def insert_found_person(body, faceBundle):
 
 # Route to create one user
 @app.route('/api/users', methods=['POST'])
-def user_create():
+def create_one_user():
     body = request.get_json(force=True)
 
     pass_hash = hashlib.sha256(body['senha'].encode())
@@ -427,7 +433,11 @@ def user_create():
 
 # Route to get one user
 @app.route('/api/users/<id>', methods=['GET'])
-def one_user_id(id):
+def get_one_user(id):
+    result = find_user_by_id(id)
+    return jsonify(buildUser(result))
+
+def find_user_by_id(id):
     query = """
         SELECT u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo, u.data_criacao, u.data_atualizacao
         FROM missing_finder.usuario u
@@ -437,10 +447,8 @@ def one_user_id(id):
     data = (id)
 
     cur.execute(query, data)
-    result = cur.fetchall()
+    return cur.fetchall()
     
-    return jsonify(buildUser(result))
-
 # Route to update one user fullname
 @app.route('/api/users/<int:id>/fullname', methods=['PATCH'])
 def change_fullname_user(id):
