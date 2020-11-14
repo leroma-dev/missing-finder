@@ -14,9 +14,13 @@ from flask_login import login_user, LoginManager
 import base64
 import hashlib
 from dateutil.relativedelta import relativedelta
+from flask_mail import Mail, Message
+import secrets
+import string
 
 app = Flask(__name__)
 app.config.from_object('config.Config')
+mail = Mail(app)
 assets: str = app.config['ASSETS']
 
 # Instantiate S3 util class
@@ -295,7 +299,7 @@ def get_all_found_person():
     if user_id:
         query = query + " AND u.id = %s"
         data = (data + (user_id,))
-
+    
     query = query + ";"
 
     if data:
@@ -458,7 +462,7 @@ def find_user_by_id(id):
 
     cur.execute(query, data)
     return cur.fetchall()
-    
+
 # Route to update one user fullname
 @app.route('/api/users/<int:id>/fullname', methods=['PATCH'])
 def change_fullname_user(id):
@@ -508,7 +512,7 @@ def change_phone_user(id):
 
     query = """
         UPDATE missing_finder.usuario
-    SET telefone = %s, data_atualizacao = %s
+        SET telefone = %s, data_atualizacao = %s
         WHERE id = %s;
     """
 
@@ -629,6 +633,43 @@ def buildUser(values):
         result.append(buildData)
     return result
 
+# Route to password recovery
+@app.route('/api/users/password-recovery', methods=['POST'])
+def recover_password():
+    body = request.get_json(force=True)
+
+    user = find_user_by_email(body['email'])
+
+    if user:
+        generated_pass = get_secure_random_string()
+
+        if update_user_password(user[0][0], generated_pass) == None:
+            send_recovery_email(user[0][2], generated_pass)
+
+    return success_handle(json.dumps({
+        'message': 'Um e-mail de recuperação foi enviado para ' + body['email']  + '.'
+    }))
+        
+def send_recovery_email(to, new_password):
+    msg = Message("Recuperação de senha", sender=("Missing Finder", "missingfinder@example.com"), recipients=[to])
+    msg.html = "<b>" + new_password + "</b>"
+    mail.send(msg)
+
+def find_user_by_email(email):
+    query = """
+        SELECT u.id, u.nome_usuario, u.email, u.senha, u.telefone, u.nome_completo, u.data_criacao, u.data_atualizacao
+        FROM missing_finder.usuario u
+        WHERE u.email = %s;
+    """
+
+    data = (email,)
+
+    cur.execute(query, data)
+    return cur.fetchall()
+
+def get_secure_random_string():
+    secure_str = ''.join((secrets.choice(string.ascii_letters) for i in range(10)))
+    return secure_str
 
 #
 #   <----      FACE RECOGNITION ENDPOINTS     ---->
@@ -673,6 +714,39 @@ def recognize():
             else:
                 return error_handle("Face da imagem não reconhecida.")
         return success_handle(return_output)
+
+#
+#    <----    NOTIFICATION ENDPOINTS   ---->
+#
+
+# Route to send notification of detected person
+@app.route('/api/notifications/detected-person', methods=['POST'])
+def send_detected_person_notification():
+    body = request.get_json(force=True)
+    subject = "Hello"
+    sender = ("Missing Finder", "missingfinder@example.com")
+
+    if body['guest']:
+        phone = body['guestPhone']
+    elif body['userId']:
+        user = find_user_by_id(body['userId'])
+        phone = user[0][4]
+    else:
+        return error_handle("É necessário informar o contato do usuário.")
+
+    if body['type'] == 'DESAPARECIDA':
+        person = find_missed_person_by_id(body['posterId'])
+        msg = Message(subject, sender=sender, recipients=[person[0][14]])
+        msg.html = "<b>desaparecida</b> " + phone
+    elif body['type'] == 'ACHADA':
+        person = find_found_person_by_id(body['posterId'])
+        msg = Message(subject, sender=sender, recipients=[person[0][15]])
+        msg.html = "<b>achada</b>"
+    else:
+        return error_handle("Tipo desconhecido de pessoa.")
+
+    mail.send(msg)
+    return success_handle()
 
 # Run the app
 app.run(host=app.config['FLASK_RUN_HOST'], port=app.config['FLASK_RUN_PORT'])
