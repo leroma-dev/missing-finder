@@ -3,6 +3,7 @@ from flask import Flask, json, Response, request, render_template, send_file, js
 from libs.FaceRecognition import FaceRecognition
 from libs.models.FaceBundle import FaceBundle
 from libs.S3Util import S3Util
+from libs.EmailUtil import EmailUtil
 from os import path, getcwd
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -25,6 +26,7 @@ assets: str = app.config['ASSETS']
 
 # Instantiate S3 util class
 s3_util = S3Util('missing-finder-bucket')
+email_util = EmailUtil()
 
 # Create cursor to PostgreSQL DB
 conn = psycopg2.connect(
@@ -647,12 +649,12 @@ def recover_password():
             send_recovery_email(user[0][2], generated_pass)
 
     return success_handle(json.dumps({
-        'message': 'Um e-mail de recuperação foi enviado para ' + body['email']  + '.'
+        'message': 'Um e-mail de recuperação foi enviado para ' + body['email'] + '.'
     }))
         
 def send_recovery_email(to, new_password):
     msg = Message("Recuperação de senha", sender=("Missing Finder", "missingfinder@example.com"), recipients=[to])
-    msg.html = "<b>" + new_password + "</b>"
+    msg.html = email_util.get_new_password_template(new_password)
     mail.send(msg)
 
 def find_user_by_email(email):
@@ -723,30 +725,38 @@ def recognize():
 @app.route('/api/notifications/detected-person', methods=['POST'])
 def send_detected_person_notification():
     body = request.get_json(force=True)
-    subject = "Hello"
+    subject = "Pessoa encontrada!"
     sender = ("Missing Finder", "missingfinder@example.com")
 
     if body['guest']:
-        phone = body['guestPhone']
+        name = body['guest']['name']
+        email = body['guest']['email']
+        phone = body['guest']['phone']
     elif body['userId']:
         user = find_user_by_id(body['userId'])
+        name = user[0][2]
+        email = user[0][3]
         phone = user[0][4]
     else:
         return error_handle("É necessário informar o contato do usuário.")
 
     if body['type'] == 'DESAPARECIDA':
         person = find_missed_person_by_id(body['posterId'])
-        msg = Message(subject, sender=sender, recipients=[person[0][14]])
-        msg.html = "<b>desaparecida</b> " + phone
+        to_email = person[0][14]
+        msg = Message(subject, sender=sender, recipients=[to_email])
     elif body['type'] == 'ACHADA':
         person = find_found_person_by_id(body['posterId'])
-        msg = Message(subject, sender=sender, recipients=[person[0][15]])
-        msg.html = "<b>achada</b>"
+        to_email = person[0][15]
+        msg = Message(subject, sender=sender, recipients=[to_email])
     else:
         return error_handle("Tipo desconhecido de pessoa.")
 
+    msg.html = email_util.get_detected_person_template(person[0][1], name, email, phone)
     mail.send(msg)
-    return success_handle()
+    return success_handle(json.dumps({
+        'message': 'Um e-mail de notificação foi enviado para ' + to_email + '.'
+    }))
+
 
 # Run the app
 app.run(host=app.config['FLASK_RUN_HOST'], port=app.config['FLASK_RUN_PORT'])
