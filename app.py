@@ -37,14 +37,6 @@ conn = psycopg2.connect(
 )
 cur = conn.cursor()
 
-# Instantiate FaceRecognition class
-app.face = FaceRecognition(storageFolderPath='storage/',
-                           knownFolderPath='known/',
-                           unknownFolderPath='unknown/',
-                           outputFolderPath='output/',
-                           s3_util=s3_util,
-                           cur=cur)
-
 # Instantiate login class
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -678,11 +670,19 @@ def get_secure_random_string():
 #
 
 def extract_face(image_path) -> FaceBundle:
+    # Instantiate FaceRecognition class
+    app_face = FaceRecognition(storageFolderPath='storage/',
+                            knownFolderPath='known/',
+                            unknownFolderPath='unknown/',
+                            outputFolderPath='output/',
+                            s3_util=s3_util,
+                            cur=cur)
+
     if not image_path:
         print("O caminho da imagem do rosto no S3 é obrigatório.")
         return error_handle("O caminho da imagem do rosto no S3 é obrigatório.")
     else:
-        return app.face.add_known_face(image_path)
+        return app_face.add_known_face(image_path)
 
 # Route to recognize a unknown face
 @app.route('/api/face-recognition', methods=['POST'])
@@ -706,7 +706,15 @@ def recognize():
 
             s3_util.upload_file(file_content=file_content, object_name=file_path)
 
-            result = app.face.find_matches(file_path, tolerance, id=id)
+            # Instantiate FaceRecognition class
+            app_face = FaceRecognition(storageFolderPath='storage/',
+                                    knownFolderPath='known/',
+                                    unknownFolderPath='unknown/',
+                                    outputFolderPath='output/',
+                                    s3_util=s3_util,
+                                    cur=cur)
+
+            result = app_face.find_matches(file_path, tolerance, id=id)
             if len(result):
                 return_output = json.dumps(
                     {
@@ -728,14 +736,14 @@ def send_detected_person_notification():
     subject = "Pessoa encontrada!"
     sender = ("Missing Finder", "missingfinder@example.com")
 
-    if body['guest']:
+    if 'guest' in body:
         name = body['guest']['name']
         email = body['guest']['email']
         phone = body['guest']['phone']
-    elif body['userId']:
+    elif 'userId' in body:
         user = find_user_by_id(body['userId'])
-        name = user[0][2]
-        email = user[0][3]
+        name = user[0][1]
+        email = user[0][2]
         phone = user[0][4]
     else:
         return error_handle("É necessário informar o contato do usuário.")
