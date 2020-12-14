@@ -174,7 +174,7 @@ class FaceRecognition:
                             image = "found/"+str(tid)+"/"+"reference.jpg"
                         
                         output = self.outputFolderPath+"result_"+id+"_"+name+"_"+str(tid)+".jpg"
-                        similarity = '{0:.2f}'.format((1/(1+np.sqrt(np.sum(face_recognition.face_distance(faceBundle.getEncodings().reshape(1,len(faceBundle.getEncodings())), np.asarray(pencoding))[0] ** 2)))) * 100)
+                        similarity = '{0:.2f}'.format((1/(1+face_recognition.face_distance(faceBundle.getEncodings().reshape(1,len(faceBundle.getEncodings())), np.asarray(pencoding))[0])) * 100)
 
                         recommendationsList.append(self.build_recommendations_response(tid, name, age, pencoding, ptype, image, output, similarity))
 
