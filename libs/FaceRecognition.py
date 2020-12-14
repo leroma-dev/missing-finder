@@ -180,9 +180,9 @@ class FaceRecognition:
 
                         self.s3_util.upload_file(b.getvalue(), output)
                         faceBundle.set_is_known(True)
-
+            sortedRecommendationsList = sorted(recommendationsList, key=lambda x: x['similarity'])
             jsonfb = json.loads(json.dumps(faceBundle.toData()))
-            jsonfb.update({"recommendations": recommendationsList})
+            jsonfb.update({"recommendations": sortedRecommendationsList})
             faceList.append(jsonfb)
         return faceList
 
