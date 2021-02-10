@@ -1,8 +1,6 @@
 from os import path, getcwd
 
-
 class Config:
-
     DEBUG = True
     FLASK_RUN_HOST = 'localhost'
     FLASK_RUN_PORT = 5000

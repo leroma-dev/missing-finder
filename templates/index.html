@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>FacialRecon</title>
+    <title>MissingFinder</title>
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon" />
     <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
     <script type="text/javascript" src="{{ url_for('static', filename='lodash.js') }}"></script>
@@ -14,30 +14,38 @@
 <body>
 
 <div class="container">
-    <h1>Face Recognition</h1>
+    <h1>Missing Finder</h1>
 
     <ul class="tabs">
-        <li data-section="train-content">Treinar</li>
+        <li data-section="train-content">Pessoa perdida</li>
         <li data-section="recognize-content">Reconhecer</li>
     </ul>
 
     <div id="train-content">
-        <h2>Treinar</h2>
+        <h2>Pessoa perdida</h2>
         <form method="post" id="train">
             <div class="message">
 
             </div>
-            <p class="description">Faça upload de uma imagem de uma face e dê um nome com que ela será reconhecida.</p>
+            <p class="description">Faça upload de uma imagem de uma face da pessoa perdida e informe os dados dela.</p>
             <div class="form-item">
                 <label for="input-file">Imagem</label>
                 <input type="file" name="file" id="input-file" accept="image/*"/>
             </div>
             <div class="form-item">
-                <label>Hash</label>
-                <input id="hash-field" name="hash" value="" type="text" placeholder="Hash"/>
+                <label>ID</label>
+                <input id="id-field" name="id" value="" type="number" placeholder="ID"/>
+            </div>
+            <div class="form-item">
+                <label>Nome</label>
+                <input id="name-field" name="name" value="" type="text" placeholder="Nome"/>
+            </div>
+            <div class="form-item">
+                <label>Idade</label>
+                <input id="age-field" name="age" value="" type="number" placeholder="Idade"/>
             </div>
             <div class="form-action">
-                <button type="submit">Treinar</button>
+                <button type="submit">Salvar</button>
             </div>
         </form>
     </div>
@@ -49,9 +57,9 @@
             <div class="message">
 
             </div>
-            <p class="description">Faça upload de uma imagem e eu te direi quem é na foto.</p>
+            <p class="description">Faça upload de uma imagem com a face da pessoa desaparecida.</p>
             <div class="form-item">
-                <label for="input-file">Imagem/Video</label>
+                <label for="input-file">Imagem</label>
                 <input type="file" name="file" id="recognize-input-file" accept="image/*,video/*"/>
             </div>
             <div class="form-item">

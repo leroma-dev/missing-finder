@@ -1,6 +1,5 @@
 import numpy
 
-
 class FaceBundle:
     filename = ''
     file_extension = ''
@@ -51,7 +50,7 @@ class FaceBundle:
             "encoding": self.encodings.tolist(),
             "landmarks": self.landmarks
         }
-        # result = json.dumps(jsonData)
+        
         return jsonData
 
     def parseJson(self, json_data):

@@ -4,4 +4,7 @@ flask
 werkzeug
 dlib==19.17.0
 imutils==0.5.3
-opencv-python==4.1.0.25
+opencv-python==4.1.2.30
+psycopg2
+boto3
+flask-login
